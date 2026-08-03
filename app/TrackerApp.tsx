@@ -786,13 +786,12 @@ export default function TrackerApp() {
             ) : (<>
               <div className="inventory-table-wrap">
                 <table className="inventory-table">
-                  <thead><tr><th>Item</th><th>Status</th><th>On hand</th><th>Avg. cost</th><th>Sales</th><th>Est. profit</th></tr></thead>
+                  <thead><tr><th>Status</th><th>Number</th><th>Cost</th><th>Sold</th><th>Profit</th></tr></thead>
                   <tbody>
                     {inventory.map((item) => (
                       <tr key={item.name}>
-                        <td><span className="item-avatar">{item.name.charAt(0).toUpperCase()}</span><div><strong>{item.name}</strong><small>{item.bought} bought · {item.sold} sold</small></div></td>
                         <td><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
-                        <td><strong>{item.onHand}</strong></td>
+                        <td><span className="item-number">{item.onHand}</span></td>
                         <td>{money.format(item.averageCost / 100)}</td>
                         <td>{money.format(item.revenue / 100)}</td>
                         <td className={item.profit < 0 ? "negative" : "profit"}>{money.format(item.profit / 100)}</td>
@@ -804,8 +803,8 @@ export default function TrackerApp() {
               <div className="inventory-mobile-list">
                 {inventory.map((item) => (
                   <article className="inventory-mobile-card" key={item.key}>
-                    <div className="mobile-item-head"><div><span className="item-avatar">{item.name.charAt(0).toUpperCase()}</span><strong>{item.name}</strong><small>{item.bought} bought · {item.sold} sold</small></div><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
-                    <div className="mobile-item-stats"><div><span>On hand</span><strong>{item.onHand}</strong></div><div><span>Avg. cost</span><strong>{money.format(item.averageCost / 100)}</strong></div><div><span>Profit</span><strong className={item.profit < 0 ? "negative" : "profit"}>{money.format(item.profit / 100)}</strong></div></div>
+                    <div className="mobile-item-head"><strong>{item.name}</strong><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
+                    <div className="mobile-item-stats"><div><span>Number</span><strong>{item.onHand}</strong></div><div><span>Cost</span><strong>{money.format(item.averageCost / 100)}</strong></div><div><span>Sold</span><strong>{money.format(item.revenue / 100)}</strong></div><div><span>Profit</span><strong className={item.profit < 0 ? "negative" : "profit"}>{money.format(item.profit / 100)}</strong></div></div>
                   </article>
                 ))}
               </div>
