@@ -68,6 +68,15 @@ a { color: inherit; }
 .type-switch .active { background: var(--card); color: var(--ink); box-shadow: 0 3px 10px rgba(23,58,52,.08); }
 .type-switch .buy-active span { color: var(--coral); }
 .type-switch .sell-active span { color: #247260; }
+.screenshot-input { display: none; }
+.screenshot-import { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 12px; margin: 0 0 16px; border: 1px dashed #c9bda7; border-radius: 12px; background: #faf6e9; }
+.import-symbol { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: var(--yellow-soft); color: var(--ink); font-size: 19px; }
+.screenshot-import strong { display: block; font-size: 12px; }
+.screenshot-import p { margin: 3px 0 0; color: var(--ink-soft); font-size: 10px; }
+.screenshot-import button { border: 0; border-radius: 8px; padding: 8px 10px; background: var(--ink); color: white; font-size: 11px; font-weight: 800; cursor: pointer; }
+.screenshot-import button:disabled { opacity: .7; cursor: wait; }
+.reading-bar { position: absolute; left: 12px; right: 12px; bottom: 5px; height: 2px; overflow: hidden; border-radius: 99px; background: #e6d9c2; }
+.reading-bar span { display: block; height: 100%; background: var(--coral); transition: width .2s ease; }
 form > label, .form-row label { display: block; margin-bottom: 16px; }
 label > span { display: block; margin-bottom: 7px; font-size: 11px; font-weight: 800; color: var(--ink-soft); }
 label em { font-style: normal; font-weight: 500; color: #8da19c; }

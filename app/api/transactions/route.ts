@@ -8,6 +8,7 @@ type TransactionRow = {
   quantity: number;
   unit_price_cents: number;
   transaction_date: string;
+  source: "eBay" | "Vinted" | "Other";
   notes: string;
   created_at: string;
 };
@@ -20,6 +21,7 @@ const createTableSql = `
     quantity REAL NOT NULL CHECK(quantity > 0),
     unit_price_cents INTEGER NOT NULL CHECK(unit_price_cents > 0),
     transaction_date TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'Other' CHECK(source IN ('eBay', 'Vinted', 'Other')),
     notes TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )
@@ -37,6 +39,10 @@ async function prepareDatabase() {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(transaction_date DESC, id DESC)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_item ON transactions(item_name)"),
   ]);
+  const columns = await db.prepare("PRAGMA table_info(transactions)").all<{ name: string }>();
+  if (!columns.results.some((column) => column.name === "source")) {
+    await db.prepare("ALTER TABLE transactions ADD COLUMN source TEXT NOT NULL DEFAULT 'Other'").run();
+  }
   return db;
 }
 
@@ -48,6 +54,7 @@ function serialize(row: TransactionRow) {
     quantity: row.quantity,
     unitPriceCents: row.unit_price_cents,
     transactionDate: row.transaction_date,
+    source: row.source ?? "Other",
     notes: row.notes,
     createdAt: row.created_at,
   };
@@ -57,7 +64,7 @@ export async function GET() {
   try {
     const db = await prepareDatabase();
     const result = await db
-      .prepare("SELECT id, type, item_name, quantity, unit_price_cents, transaction_date, notes, created_at FROM transactions ORDER BY transaction_date DESC, id DESC")
+      .prepare("SELECT id, type, item_name, quantity, unit_price_cents, transaction_date, source, notes, created_at FROM transactions ORDER BY transaction_date DESC, id DESC")
       .all<TransactionRow>();
     return NextResponse.json({ transactions: result.results.map(serialize) });
   } catch {
@@ -73,9 +80,10 @@ export async function POST(request: NextRequest) {
     const quantity = Number(input.quantity);
     const unitPrice = Number(input.unitPrice);
     const transactionDate = String(input.transactionDate ?? "");
+    const source = input.source;
     const notes = String(input.notes ?? "").trim();
 
-    if ((type !== "buy" && type !== "sell") || !itemName || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(transactionDate)) {
+    if ((type !== "buy" && type !== "sell") || (source !== "eBay" && source !== "Vinted" && source !== "Other") || !itemName || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(transactionDate)) {
       return NextResponse.json({ error: "Please complete all required fields with valid values." }, { status: 400 });
     }
     if (itemName.length > 80 || notes.length > 160) {
@@ -94,8 +102,8 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await db
-      .prepare("INSERT INTO transactions (type, item_name, quantity, unit_price_cents, transaction_date, notes) VALUES (?, ?, ?, ?, ?, ?) RETURNING id, type, item_name, quantity, unit_price_cents, transaction_date, notes, created_at")
-      .bind(type, itemName, quantity, Math.round(unitPrice * 100), transactionDate, notes)
+      .prepare("INSERT INTO transactions (type, item_name, quantity, unit_price_cents, transaction_date, source, notes) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, type, item_name, quantity, unit_price_cents, transaction_date, source, notes, created_at")
+      .bind(type, itemName, quantity, Math.round(unitPrice * 100), transactionDate, source, notes)
       .first<TransactionRow>();
 
     if (!result) throw new Error("Insert failed");
@@ -113,7 +121,7 @@ export async function DELETE(request: NextRequest) {
     }
     const db = await prepareDatabase();
     const transaction = await db
-      .prepare("SELECT id, type, item_name, quantity, unit_price_cents, transaction_date, notes, created_at FROM transactions WHERE id = ?")
+      .prepare("SELECT id, type, item_name, quantity, unit_price_cents, transaction_date, source, notes, created_at FROM transactions WHERE id = ?")
       .bind(id)
       .first<TransactionRow>();
     if (!transaction) {

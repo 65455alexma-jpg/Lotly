@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Transaction = {
   id: number;
@@ -9,6 +9,7 @@ type Transaction = {
   quantity: number;
   unitPriceCents: number;
   transactionDate: string;
+  source: "eBay" | "Vinted" | "Other";
   notes: string;
   createdAt: string;
 };
@@ -44,6 +45,37 @@ function formatDate(value: string) {
   }).format(new Date(`${value}T12:00:00`));
 }
 
+function sourceFromText(text: string): "eBay" | "Vinted" | "Other" {
+  if (/\bvinted\b/i.test(text)) return "Vinted";
+  if (/\be\s*bay\b/i.test(text)) return "eBay";
+  return "Other";
+}
+
+function priceFromText(text: string) {
+  const preferred = text.match(/(?:total|item price|price paid|you paid)[^£\d]{0,30}£\s?(\d{1,6}(?:[,.]\d{2})?)/i);
+  const amounts = [...text.matchAll(/£\s?(\d{1,6}(?:[,.]\d{2})?)/g)].map((match) => Number(match[1].replace(",", ".")));
+  return preferred ? preferred[1].replace(",", ".") : amounts.length ? String(Math.max(...amounts)) : "";
+}
+
+function quantityFromText(text: string) {
+  const match = text.match(/(?:quantity|qty)\s*[:x]?\s*(\d+(?:\.\d+)?)/i);
+  return match?.[1] ?? "1";
+}
+
+function dateFromText(text: string) {
+  const match = text.match(/\b(?:\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/i);
+  if (!match) return localDate();
+  const parsed = new Date(match[0]);
+  return Number.isNaN(parsed.getTime()) ? localDate() : parsed.toISOString().slice(0, 10);
+}
+
+function itemFromText(text: string, source: string) {
+  const lines = text.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const ignored = /^(ebay|vinted|order|purchase|payment|total|delivery|tracking|quantity|qty|buy again|view order|thank you|sold|item|price|£)/i;
+  const likely = lines.find((line) => line.length > 4 && line.length < 82 && !ignored.test(line) && !/^\d/.test(line));
+  return likely || `${source} item`;
+}
+
 export default function TrackerApp() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,9 +87,13 @@ export default function TrackerApp() {
   const [quantity, setQuantity] = useState("1");
   const [unitPrice, setUnitPrice] = useState("");
   const [date, setDate] = useState(localDate());
+  const [source, setSource] = useState<"eBay" | "Vinted" | "Other">("eBay");
   const [notes, setNotes] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "buy" | "sell">("all");
+  const [readingScreenshot, setReadingScreenshot] = useState(false);
+  const [readingProgress, setReadingProgress] = useState(0);
+  const screenshotInput = useRef<HTMLInputElement>(null);
 
   async function loadTransactions() {
     try {
@@ -140,6 +176,49 @@ export default function TrackerApp() {
   const thisMonth = localDate().slice(0, 7);
   const monthlyTransactions = transactions.filter((entry) => entry.transactionDate.startsWith(thisMonth)).length;
 
+  async function readScreenshot(event: ChangeEvent<HTMLInputElement>) {
+    const screenshot = event.target.files?.[0];
+    if (!screenshot) return;
+    if (!screenshot.type.startsWith("image/")) {
+      setError("Please choose an image or screenshot.");
+      return;
+    }
+    if (screenshot.size > 12 * 1024 * 1024) {
+      setError("Please use a screenshot smaller than 12 MB.");
+      return;
+    }
+
+    setError("");
+    setNotice("");
+    setReadingScreenshot(true);
+    setReadingProgress(4);
+    try {
+      const { recognize } = await import("tesseract.js");
+      const result = await recognize(screenshot, "eng", {
+        logger: (message) => {
+          if (message.status === "recognizing text") setReadingProgress(Math.max(8, Math.round(message.progress * 100)));
+        },
+      });
+      const text = result.data.text;
+      const foundSource = sourceFromText(text);
+      const foundItem = itemFromText(text, foundSource);
+      const foundPrice = priceFromText(text);
+      setSource(foundSource);
+      setItemName(foundItem);
+      setQuantity(quantityFromText(text));
+      setUnitPrice(foundPrice);
+      setDate(dateFromText(text));
+      setNotes(`${foundSource !== "Other" ? `${foundSource} screenshot` : "Screenshot import"} — please check the details.`);
+      setNotice(foundPrice ? "Details read from the screenshot. Please check them, then save." : "Some details were read. Please complete the price before saving.");
+    } catch {
+      setError("I could not read that screenshot. Try a clear, uncropped image or add the details manually.");
+    } finally {
+      setReadingScreenshot(false);
+      setReadingProgress(0);
+      event.target.value = "";
+    }
+  }
+
   async function submitTransaction(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -156,6 +235,7 @@ export default function TrackerApp() {
           quantity: Number(quantity),
           unitPrice: Number(unitPrice),
           transactionDate: date,
+          source,
           notes,
         }),
       });
@@ -168,6 +248,7 @@ export default function TrackerApp() {
       setItemName("");
       setQuantity("1");
       setUnitPrice("");
+      setSource("eBay");
       setNotes("");
       setNotice(type === "buy" ? "Purchase recorded." : "Sale recorded.");
     } catch (saveError) {
@@ -258,6 +339,15 @@ export default function TrackerApp() {
           </div>
 
           <form onSubmit={submitTransaction}>
+            <input ref={screenshotInput} className="screenshot-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={readScreenshot} />
+            <section className="screenshot-import" aria-label="Import details from a screenshot">
+              <div className="import-symbol">▧</div>
+              <div><strong>Import from screenshot</strong><p>eBay or Vinted order screen</p></div>
+              <button type="button" onClick={() => screenshotInput.current?.click()} disabled={readingScreenshot}>
+                {readingScreenshot ? `Reading ${readingProgress}%` : "Upload"}
+              </button>
+              {readingScreenshot && <div className="reading-bar"><span style={{ width: `${readingProgress}%` }} /></div>}
+            </section>
             <div className="type-switch" role="group" aria-label="Transaction type">
               <button type="button" className={type === "buy" ? "active buy-active" : ""} onClick={() => setType("buy")}>
                 <span>↓</span> Buy
@@ -270,6 +360,15 @@ export default function TrackerApp() {
             <label>
               <span>Item name</span>
               <input value={itemName} onChange={(event) => setItemName(event.target.value)} placeholder="e.g. Vintage camera" required maxLength={80} />
+            </label>
+
+            <label>
+              <span>Source</span>
+              <select value={source} onChange={(event) => setSource(event.target.value as typeof source)}>
+                <option value="eBay">eBay</option>
+                <option value="Vinted">Vinted</option>
+                <option value="Other">Other</option>
+              </select>
             </label>
 
             <div className="form-row">
@@ -375,7 +474,7 @@ export default function TrackerApp() {
                     <div className={`transaction-icon ${entry.type}`}>{entry.type === "buy" ? "↓" : "↑"}</div>
                     <div className="transaction-main">
                       <div><strong>{entry.itemName}</strong><span className={`type-label ${entry.type}`}>{entry.type === "buy" ? "Bought" : "Sold"}</span></div>
-                      <p>{formatDate(entry.transactionDate)} · {entry.quantity} × {money.format(entry.unitPriceCents / 100)}{entry.notes ? ` · ${entry.notes}` : ""}</p>
+                      <p>{formatDate(entry.transactionDate)} · {entry.source} · {entry.quantity} × {money.format(entry.unitPriceCents / 100)}{entry.notes ? ` · ${entry.notes}` : ""}</p>
                     </div>
                     <div className="transaction-amount">
                       <strong>{entry.type === "buy" ? "−" : "+"}{money.format((entry.quantity * entry.unitPriceCents) / 100)}</strong>
