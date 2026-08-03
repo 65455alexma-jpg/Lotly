@@ -77,6 +77,28 @@ a { color: inherit; }
 .screenshot-import button:disabled { opacity: .7; cursor: wait; }
 .reading-bar { position: absolute; left: 12px; right: 12px; bottom: 5px; height: 2px; overflow: hidden; border-radius: 99px; background: #e6d9c2; }
 .reading-bar span { display: block; height: 100%; background: var(--coral); transition: width .2s ease; }
+.batch-review { margin: 0 0 18px; padding: 14px; border: 1px solid #c9bda7; border-radius: 13px; background: #fffaf0; }
+.batch-heading { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.batch-heading .eyebrow { display: block; margin: 0 0 4px; font-size: 9px; }
+.batch-heading strong { display: block; font-size: 13px; }
+.batch-heading button { border: 0; background: none; color: var(--ink-soft); font-size: 10px; text-decoration: underline; cursor: pointer; }
+.batch-review > p { margin: 7px 0 12px; color: var(--ink-soft); font-size: 10px; line-height: 1.4; }
+.batch-items { display: grid; gap: 8px; max-height: 310px; overflow: auto; padding-right: 2px; }
+.batch-item { display: grid; grid-template-columns: auto 1fr; gap: 9px; padding: 10px; border: 1px solid #e4dccb; border-radius: 10px; background: white; }
+.batch-item > input { width: 15px; height: 15px; margin-top: 5px; accent-color: var(--ink); }
+.batch-fields { min-width: 0; display: grid; gap: 7px; }
+.batch-fields > input { padding: 8px 9px; font-size: 11px; }
+.batch-fields > div { display: flex; align-items: center; gap: 6px; }
+.batch-fields > div > input { width: 52px; padding: 8px 7px; font-size: 11px; }
+.batch-fields > div > span { color: var(--ink-soft); font-size: 12px; }
+.batch-price { display: flex; align-items: center; flex: 1; border: 1px solid var(--line); border-radius: 8px; padding-left: 8px; }
+.batch-price > span { color: var(--ink-soft); font-size: 11px; font-weight: 700; }
+.batch-price input { width: 100% !important; border: 0; padding-left: 5px !important; }
+.batch-selects { display: grid !important; grid-template-columns: .85fr 1.25fr; gap: 6px !important; }
+.batch-selects select { padding: 7px 8px; font-size: 10px; }
+.batch-save { width: 100%; border: 0; border-radius: 9px; margin-top: 12px; padding: 11px 13px; background: var(--ink); color: white; font-size: 11px; font-weight: 800; cursor: pointer; }
+.batch-save.sell { background: var(--coral); }
+.batch-save:disabled { opacity: .6; cursor: wait; }
 form > label, .form-row label { display: block; margin-bottom: 16px; }
 label > span { display: block; margin-bottom: 7px; font-size: 11px; font-weight: 800; color: var(--ink-soft); }
 label em { font-style: normal; font-weight: 500; color: #8da19c; }

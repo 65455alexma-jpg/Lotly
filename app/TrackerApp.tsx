@@ -42,6 +42,17 @@ type CategoryRow = {
   profit: number;
 };
 
+type ImportedItem = {
+  id: string;
+  selected: boolean;
+  itemName: string;
+  quantity: string;
+  unitPrice: string;
+  transactionDate: string;
+  source: "eBay" | "Vinted" | "Other";
+  category: ProductCategory;
+};
+
 const categories: ProductCategory[] = ["Clothing", "Electronics", "Home & garden", "Collectibles", "Beauty", "Other"];
 const categoryMarks: Record<ProductCategory, string> = {
   Clothing: "◒", Electronics: "▣", "Home & garden": "⌂", Collectibles: "◇", Beauty: "✦", Other: "○",
@@ -107,6 +118,36 @@ function categoryFromText(text: string): ProductCategory {
   return "Other";
 }
 
+function itemsFromText(text: string): ImportedItem[] {
+  const lines = text.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const source = sourceFromText(text);
+  const date = dateFromText(text);
+  const ignored = /(?:order total|subtotal|delivery|postage|discount|fees?|tax|vat|payment|amount paid|you paid|total)/i;
+  const items: ImportedItem[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!/£\s?\d/.test(line) || ignored.test(line)) continue;
+    const unitPrice = priceFromText(line);
+    if (!unitPrice) continue;
+    const candidates = [lines[index - 1], lines[index - 2]].filter(Boolean);
+    const itemName = candidates.find((candidate) => candidate.length > 3 && candidate.length < 82 && !ignored.test(candidate) && !/£\s?\d/.test(candidate)) ?? `${source} item ${items.length + 1}`;
+    const fingerprint = `${itemName.toLowerCase()}-${unitPrice}`;
+    if (items.some((item) => `${item.itemName.toLowerCase()}-${item.unitPrice}` === fingerprint)) continue;
+    items.push({
+      id: `${index}-${fingerprint}`,
+      selected: true,
+      itemName,
+      quantity: quantityFromText(`${candidates.join(" ")} ${line}`),
+      unitPrice,
+      transactionDate: date,
+      source,
+      category: categoryFromText(itemName),
+    });
+  }
+  return items;
+}
+
 export default function TrackerApp() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [itemStatuses, setItemStatuses] = useState<Record<string, InventoryStatus>>({});
@@ -126,6 +167,8 @@ export default function TrackerApp() {
   const [filter, setFilter] = useState<"all" | "buy" | "sell">("all");
   const [readingScreenshot, setReadingScreenshot] = useState(false);
   const [readingProgress, setReadingProgress] = useState(0);
+  const [importedItems, setImportedItems] = useState<ImportedItem[]>([]);
+  const [savingImport, setSavingImport] = useState(false);
   const screenshotInput = useRef<HTMLInputElement>(null);
 
   async function loadTransactions() {
@@ -263,6 +306,12 @@ export default function TrackerApp() {
       const foundSource = sourceFromText(text);
       const foundItem = itemFromText(text, foundSource);
       const foundPrice = priceFromText(text);
+      const foundItems = itemsFromText(text);
+      if (foundItems.length > 1) {
+        setImportedItems(foundItems);
+        setNotice(`${foundItems.length} items found. Review them below, then add each one as a separate ${type} record.`);
+        return;
+      }
       setSource(foundSource);
       setCategory(categoryFromText(`${foundItem}\n${text}`));
       setItemName(foundItem);
@@ -277,6 +326,44 @@ export default function TrackerApp() {
       setReadingScreenshot(false);
       setReadingProgress(0);
       event.target.value = "";
+    }
+  }
+
+  function changeImportedItem(id: string, field: keyof ImportedItem, value: string | boolean) {
+    setImportedItems((current) => current.map((item) => item.id === id ? { ...item, [field]: value } : item));
+  }
+
+  async function saveImportedItems() {
+    const selectedItems = importedItems.filter((item) => item.selected);
+    if (!selectedItems.length) {
+      setError("Choose at least one item to add.");
+      return;
+    }
+    if (selectedItems.some((item) => !item.itemName.trim() || Number(item.quantity) <= 0 || Number(item.unitPrice) <= 0)) {
+      setError("Please give every selected item a name, quantity, and price.");
+      return;
+    }
+    setSavingImport(true);
+    setError("");
+    try {
+      const results: Transaction[] = [];
+      for (const item of selectedItems) {
+        const response = await fetch("/api/transactions", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ type, itemName: item.itemName, quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), transactionDate: item.transactionDate, source: item.source, category: item.category, notes: "Imported from multi-item screenshot" }),
+        });
+        const data = (await response.json()) as { transaction?: Transaction; error?: string };
+        if (!response.ok || !data.transaction) throw new Error(data.error || `Could not add ${item.itemName}.`);
+        results.push(data.transaction);
+      }
+      setTransactions((current) => [...results, ...current]);
+      setImportedItems([]);
+      setNotice(`${results.length} separate ${type} records added.`);
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : "Could not add all imported items.");
+    } finally {
+      setSavingImport(false);
     }
   }
 
@@ -424,12 +511,31 @@ export default function TrackerApp() {
             <input ref={screenshotInput} className="screenshot-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={readScreenshot} />
             <section className="screenshot-import" aria-label="Import details from a screenshot">
               <div className="import-symbol">▧</div>
-              <div><strong>Import from screenshot</strong><p>eBay or Vinted order screen</p></div>
+              <div><strong>Import one or many items</strong><p>eBay or Vinted order screen</p></div>
               <button type="button" onClick={() => screenshotInput.current?.click()} disabled={readingScreenshot}>
                 {readingScreenshot ? `Reading ${readingProgress}%` : "Upload"}
               </button>
               {readingScreenshot && <div className="reading-bar"><span style={{ width: `${readingProgress}%` }} /></div>}
             </section>
+            {importedItems.length > 0 && (
+              <section className="batch-review" aria-label="Review imported items">
+                <div className="batch-heading"><div><span className="eyebrow">MULTI-ITEM IMPORT</span><strong>{importedItems.filter((item) => item.selected).length} items ready to add</strong></div><button type="button" onClick={() => setImportedItems([])}>Clear</button></div>
+                <p>Each selected row becomes its own {type} record.</p>
+                <div className="batch-items">
+                  {importedItems.map((item) => (
+                    <article className="batch-item" key={item.id}>
+                      <input type="checkbox" checked={item.selected} onChange={(event) => changeImportedItem(item.id, "selected", event.target.checked)} aria-label={`Include ${item.itemName}`} />
+                      <div className="batch-fields">
+                        <input value={item.itemName} onChange={(event) => changeImportedItem(item.id, "itemName", event.target.value)} aria-label="Item name" />
+                        <div><input type="number" min="0.01" step="0.01" value={item.quantity} onChange={(event) => changeImportedItem(item.id, "quantity", event.target.value)} aria-label="Quantity" /><span>×</span><div className="batch-price"><span>£</span><input type="number" min="0.01" step="0.01" value={item.unitPrice} onChange={(event) => changeImportedItem(item.id, "unitPrice", event.target.value)} aria-label="Price per unit" /></div></div>
+                        <div className="batch-selects"><select value={item.source} onChange={(event) => changeImportedItem(item.id, "source", event.target.value)} aria-label="Source"><option value="eBay">eBay</option><option value="Vinted">Vinted</option><option value="Other">Other</option></select><select value={item.category} onChange={(event) => changeImportedItem(item.id, "category", event.target.value)} aria-label="Product type">{categories.map((option) => <option value={option} key={option}>{option}</option>)}</select></div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <button type="button" className={`batch-save ${type}`} onClick={() => void saveImportedItems()} disabled={savingImport}>{savingImport ? "Adding records…" : `Add selected as ${type}s`}</button>
+              </section>
+            )}
             <div className="type-switch" role="group" aria-label="Transaction type">
               <button type="button" className={type === "buy" ? "active buy-active" : ""} onClick={() => setType("buy")}>
                 <span>↓</span> Buy
