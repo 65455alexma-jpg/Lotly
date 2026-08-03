@@ -85,9 +85,10 @@ function sourceFromText(text: string): "eBay" | "Vinted" | "Other" {
 }
 
 function priceFromText(text: string) {
-  const preferred = text.match(/(?:total|item price|price paid|you paid)[^£\d]{0,30}£\s?(\d{1,6}(?:[,.]\d{2})?)/i);
-  const amounts = [...text.matchAll(/£\s?(\d{1,6}(?:[,.]\d{2})?)/g)].map((match) => Number(match[1].replace(",", ".")));
-  return preferred ? preferred[1].replace(",", ".") : amounts.length ? String(Math.max(...amounts)) : "";
+  const matches = [...text.matchAll(/(?:£\s?|GBP\s?)(\d{1,6}(?:[,.]\d{2})?)/gi)];
+  if (!matches.length) return "";
+  const preferred = matches.find((match) => /(?:item|price|sold for|paid|earnings)/i.test(text.slice(Math.max(0, (match.index ?? 0) - 28), (match.index ?? 0) + 8)));
+  return (preferred ?? matches[0])[1].replace(",", ".");
 }
 
 function quantityFromText(text: string) {
@@ -109,6 +110,10 @@ function itemFromText(text: string, source: string) {
   return likely || `${source} item`;
 }
 
+function isItemName(line: string) {
+  return line.length > 3 && line.length < 100 && !/^(ebay|vinted|order|purchase|payment|total|delivery|tracking|quantity|qty|buy again|view order|thank you|sold|item|price|£)/i.test(line) && !/^\d/.test(line) && !/(?:subtotal|postage|discount|fees?|tax|vat|amount paid|you paid)/i.test(line);
+}
+
 function categoryFromText(text: string): ProductCategory {
   if (/dress|jacket|shirt|shoe|trainer|jeans|bag|clothing|hoodie|coat/i.test(text)) return "Clothing";
   if (/phone|ipad|iphone|laptop|camera|console|headphone|charger|electronic/i.test(text)) return "Electronics";
@@ -127,11 +132,11 @@ function itemsFromText(text: string): ImportedItem[] {
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (!/£\s?\d/.test(line) || ignored.test(line)) continue;
+    if (!/(?:£\s?|GBP\s?)\d/i.test(line) || ignored.test(line)) continue;
     const unitPrice = priceFromText(line);
     if (!unitPrice) continue;
-    const candidates = [lines[index - 1], lines[index - 2]].filter(Boolean);
-    const itemName = candidates.find((candidate) => candidate.length > 3 && candidate.length < 82 && !ignored.test(candidate) && !/£\s?\d/.test(candidate)) ?? `${source} item ${items.length + 1}`;
+    const candidates = [lines[index - 1], lines[index - 2], lines[index + 1]].filter(Boolean);
+    const itemName = candidates.find(isItemName) ?? `${source} item ${items.length + 1}`;
     const fingerprint = `${itemName.toLowerCase()}-${unitPrice}`;
     if (items.some((item) => `${item.itemName.toLowerCase()}-${item.unitPrice}` === fingerprint)) continue;
     items.push({
@@ -168,6 +173,7 @@ export default function TrackerApp() {
   const [readingScreenshot, setReadingScreenshot] = useState(false);
   const [readingProgress, setReadingProgress] = useState(0);
   const [importedItems, setImportedItems] = useState<ImportedItem[]>([]);
+  const [ocrText, setOcrText] = useState("");
   const [savingImport, setSavingImport] = useState(false);
   const screenshotInput = useRef<HTMLInputElement>(null);
 
@@ -296,32 +302,37 @@ export default function TrackerApp() {
     setReadingScreenshot(true);
     setReadingProgress(4);
     try {
-      const { recognize } = await import("tesseract.js");
-      const result = await recognize(screenshot, "eng", {
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("eng", 1, {
+        workerPath: "/ocr/worker.min.js",
+        corePath: "/ocr",
+        langPath: "/ocr",
         logger: (message) => {
           if (message.status === "recognizing text") setReadingProgress(Math.max(8, Math.round(message.progress * 100)));
         },
       });
+      const result = await worker.recognize(screenshot);
+      await worker.terminate();
       const text = result.data.text;
       const foundSource = sourceFromText(text);
       const foundItem = itemFromText(text, foundSource);
       const foundPrice = priceFromText(text);
       const foundItems = itemsFromText(text);
-      if (foundItems.length > 1) {
-        setImportedItems(foundItems);
-        setNotice(`${foundItems.length} items found. Review them below, then add each one as a separate ${type} record.`);
-        return;
-      }
-      setSource(foundSource);
-      setCategory(categoryFromText(`${foundItem}\n${text}`));
-      setItemName(foundItem);
-      setQuantity(quantityFromText(text));
-      setUnitPrice(foundPrice);
-      setDate(dateFromText(text));
-      setNotes(`${foundSource !== "Other" ? `${foundSource} screenshot` : "Screenshot import"} — please check the details.`);
-      setNotice(foundPrice ? "Details read from the screenshot. Please check them, then save." : "Some details were read. Please complete the price before saving.");
+      const reviewItems = foundItems.length ? foundItems : [{
+        id: "single-import",
+        selected: true,
+        itemName: foundItem,
+        quantity: quantityFromText(text),
+        unitPrice: foundPrice,
+        transactionDate: dateFromText(text),
+        source: foundSource,
+        category: categoryFromText(`${foundItem}\n${text}`),
+      }];
+      setImportedItems(reviewItems);
+      setOcrText(text.trim());
+      setNotice(`${reviewItems.length} ${reviewItems.length === 1 ? "item is" : "items are"} ready for your review. Check the name and price before adding.`);
     } catch {
-      setError("I could not read that screenshot. Try a clear, uncropped image or add the details manually.");
+      setError("The picture could not be read. Try a clear, full order screen with the item names and prices visible.");
     } finally {
       setReadingScreenshot(false);
       setReadingProgress(0);
@@ -519,8 +530,8 @@ export default function TrackerApp() {
             </section>
             {importedItems.length > 0 && (
               <section className="batch-review" aria-label="Review imported items">
-                <div className="batch-heading"><div><span className="eyebrow">MULTI-ITEM IMPORT</span><strong>{importedItems.filter((item) => item.selected).length} items ready to add</strong></div><button type="button" onClick={() => setImportedItems([])}>Clear</button></div>
-                <p>Each selected row becomes its own {type} record.</p>
+                <div className="batch-heading"><div><span className="eyebrow">IMPORT REVIEW</span><strong>{importedItems.filter((item) => item.selected).length} items ready to add</strong></div><button type="button" onClick={() => { setImportedItems([]); setOcrText(""); }}>Clear</button></div>
+                <p>Each selected row becomes its own {type} record. The fields below are suggestions from the picture—please correct anything that is wrong.</p>
                 <div className="batch-items">
                   {importedItems.map((item) => (
                     <article className="batch-item" key={item.id}>
@@ -534,6 +545,7 @@ export default function TrackerApp() {
                   ))}
                 </div>
                 <button type="button" className={`batch-save ${type}`} onClick={() => void saveImportedItems()} disabled={savingImport}>{savingImport ? "Adding records…" : `Add selected as ${type}s`}</button>
+                {ocrText && <details className="ocr-details"><summary>See the text read from the picture</summary><p>{ocrText}</p></details>}
               </section>
             )}
             <div className="type-switch" role="group" aria-label="Transaction type">

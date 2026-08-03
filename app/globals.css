@@ -99,6 +99,9 @@ a { color: inherit; }
 .batch-save { width: 100%; border: 0; border-radius: 9px; margin-top: 12px; padding: 11px 13px; background: var(--ink); color: white; font-size: 11px; font-weight: 800; cursor: pointer; }
 .batch-save.sell { background: var(--coral); }
 .batch-save:disabled { opacity: .6; cursor: wait; }
+.ocr-details { margin-top: 11px; border-top: 1px solid #e4dccb; padding-top: 10px; color: var(--ink-soft); font-size: 10px; line-height: 1.45; }
+.ocr-details summary { cursor: pointer; color: var(--ink); font-weight: 800; }
+.ocr-details p { max-height: 110px; overflow: auto; margin: 8px 0 0; padding: 8px; border-radius: 8px; background: #f6f1e6; white-space: pre-wrap; }
 form > label, .form-row label { display: block; margin-bottom: 16px; }
 label > span { display: block; margin-bottom: 7px; font-size: 11px; font-weight: 800; color: var(--ink-soft); }
 label em { font-style: normal; font-weight: 500; color: #8da19c; }
