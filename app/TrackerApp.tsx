@@ -799,11 +799,12 @@ export default function TrackerApp() {
             ) : (<>
               <div className="inventory-table-wrap">
                 <table className="inventory-table">
-                  <thead><tr><th>Status</th><th>Number</th><th>Cost</th><th>Sold</th><th>Profit</th></tr></thead>
+                  <thead><tr><th>Item</th><th>Status</th><th>Number</th><th>Cost</th><th>Sold</th><th>Profit</th></tr></thead>
                   <tbody>
                     {inventory.map((item) => (
                       <tr key={item.name}>
-                        <td><button type="button" className="inventory-link" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.name}</button><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
+                        <td><button type="button" className="inventory-link" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.name}</button></td>
+                        <td><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
                         <td><button type="button" className="item-number item-button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.onHand}</button></td>
                         <td><button type="button" className="detail-value" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{money.format(item.averageCost / 100)}</button></td>
                         <td><button type="button" className="detail-value" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{money.format(item.revenue / 100)}</button></td>
