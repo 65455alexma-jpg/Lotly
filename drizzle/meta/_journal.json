@@ -15,6 +15,13 @@
       "when": 1785773372838,
       "tag": "0001_violet_naoko",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785773603421,
+      "tag": "0002_tricky_mole_man",
+      "breakpoints": true
     }
   ]
 }

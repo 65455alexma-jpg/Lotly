@@ -10,6 +10,7 @@ type Transaction = {
   unitPriceCents: number;
   transactionDate: string;
   source: "eBay" | "Vinted" | "Other";
+  category: ProductCategory;
   notes: string;
   createdAt: string;
 };
@@ -23,6 +24,23 @@ type InventoryRow = {
   invested: number;
   revenue: number;
   profit: number;
+};
+
+type ProductCategory = "Clothing" | "Electronics" | "Home & garden" | "Collectibles" | "Beauty" | "Other";
+
+type CategoryRow = {
+  name: ProductCategory;
+  bought: number;
+  sold: number;
+  onHand: number;
+  cost: number;
+  revenue: number;
+  profit: number;
+};
+
+const categories: ProductCategory[] = ["Clothing", "Electronics", "Home & garden", "Collectibles", "Beauty", "Other"];
+const categoryMarks: Record<ProductCategory, string> = {
+  Clothing: "◒", Electronics: "▣", "Home & garden": "⌂", Collectibles: "◇", Beauty: "✦", Other: "○",
 };
 
 const money = new Intl.NumberFormat("en-GB", {
@@ -76,6 +94,15 @@ function itemFromText(text: string, source: string) {
   return likely || `${source} item`;
 }
 
+function categoryFromText(text: string): ProductCategory {
+  if (/dress|jacket|shirt|shoe|trainer|jeans|bag|clothing|hoodie|coat/i.test(text)) return "Clothing";
+  if (/phone|ipad|iphone|laptop|camera|console|headphone|charger|electronic/i.test(text)) return "Electronics";
+  if (/vase|lamp|chair|table|plant|kitchen|garden|cushion|home/i.test(text)) return "Home & garden";
+  if (/vintage|rare|figure|card|comic|collectible|stamp|trading card/i.test(text)) return "Collectibles";
+  if (/makeup|skincare|perfume|beauty|lipstick|foundation/i.test(text)) return "Beauty";
+  return "Other";
+}
+
 export default function TrackerApp() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +115,7 @@ export default function TrackerApp() {
   const [unitPrice, setUnitPrice] = useState("");
   const [date, setDate] = useState(localDate());
   const [source, setSource] = useState<"eBay" | "Vinted" | "Other">("eBay");
+  const [category, setCategory] = useState<ProductCategory>("Clothing");
   const [notes, setNotes] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "buy" | "sell">("all");
@@ -161,6 +189,27 @@ export default function TrackerApp() {
     return { purchaseSpend, revenue, inventoryValue, profit, units };
   }, [inventory, transactions]);
 
+  const categoryAnalytics = useMemo<CategoryRow[]>(() => {
+    const rows = new Map<ProductCategory, CategoryRow>();
+    for (const transaction of transactions) {
+      const key = transaction.category ?? "Other";
+      const row = rows.get(key) ?? { name: key, bought: 0, sold: 0, onHand: 0, cost: 0, revenue: 0, profit: 0 };
+      if (transaction.type === "buy") {
+        row.bought += transaction.quantity;
+        row.cost += transaction.quantity * transaction.unitPriceCents;
+      } else {
+        row.sold += transaction.quantity;
+        row.revenue += transaction.quantity * transaction.unitPriceCents;
+      }
+      row.onHand = row.bought - row.sold;
+      row.profit = row.revenue - (row.bought ? (row.sold * row.cost) / row.bought : 0);
+      rows.set(key, row);
+    }
+    return Array.from(rows.values()).sort((a, b) => b.revenue - a.revenue || b.profit - a.profit);
+  }, [transactions]);
+
+  const highestCategoryRevenue = Math.max(1, ...categoryAnalytics.map((row) => row.revenue));
+
   const visibleTransactions = useMemo(() => {
     const query = search.trim().toLowerCase();
     return transactions.filter(
@@ -204,6 +253,7 @@ export default function TrackerApp() {
       const foundItem = itemFromText(text, foundSource);
       const foundPrice = priceFromText(text);
       setSource(foundSource);
+      setCategory(categoryFromText(`${foundItem}\n${text}`));
       setItemName(foundItem);
       setQuantity(quantityFromText(text));
       setUnitPrice(foundPrice);
@@ -236,6 +286,7 @@ export default function TrackerApp() {
           unitPrice: Number(unitPrice),
           transactionDate: date,
           source,
+          category,
           notes,
         }),
       });
@@ -249,6 +300,7 @@ export default function TrackerApp() {
       setQuantity("1");
       setUnitPrice("");
       setSource("eBay");
+      setCategory("Clothing");
       setNotes("");
       setNotice(type === "buy" ? "Purchase recorded." : "Sale recorded.");
     } catch (saveError) {
@@ -371,6 +423,13 @@ export default function TrackerApp() {
               </select>
             </label>
 
+            <label>
+              <span>Product type</span>
+              <select value={category} onChange={(event) => setCategory(event.target.value as ProductCategory)}>
+                {categories.map((option) => <option value={option} key={option}>{option}</option>)}
+              </select>
+            </label>
+
             <div className="form-row">
               <label>
                 <span>Quantity</span>
@@ -443,6 +502,33 @@ export default function TrackerApp() {
             )}
           </section>
 
+          <section className="analysis-panel">
+            <div className="section-heading inline-heading">
+              <div>
+                <p className="eyebrow">CATEGORY PERFORMANCE</p>
+                <h2>What&apos;s working</h2>
+              </div>
+              <span className="item-count">{categoryAnalytics.length} {categoryAnalytics.length === 1 ? "type" : "types"}</span>
+            </div>
+
+            {categoryAnalytics.length === 0 ? (
+              <div className="analysis-empty"><span>◌</span><p>Choose a product type when you add an item to see category insights here.</p></div>
+            ) : (
+              <div className="analysis-list">
+                {categoryAnalytics.map((row) => {
+                  const margin = row.revenue ? (row.profit / row.revenue) * 100 : 0;
+                  return (
+                    <article className="category-row" key={row.name}>
+                      <div className="category-name"><span>{categoryMarks[row.name]}</span><div><strong>{row.name}</strong><small>{row.onHand} on hand · {row.sold} sold</small></div></div>
+                      <div className="category-metrics"><div><span>Sales</span><strong>{money.format(row.revenue / 100)}</strong></div><div><span>Est. profit</span><strong className={row.profit < 0 ? "negative" : "profit"}>{money.format(row.profit / 100)}</strong></div><div><span>Margin</span><strong className={margin < 0 ? "negative" : ""}>{row.revenue ? `${margin.toFixed(0)}%` : "—"}</strong></div></div>
+                      <div className="category-bar" aria-hidden="true"><span style={{ width: `${(row.revenue / highestCategoryRevenue) * 100}%` }} /></div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
           <section className="history-panel">
             <div className="section-heading inline-heading history-heading">
               <div>
@@ -474,7 +560,7 @@ export default function TrackerApp() {
                     <div className={`transaction-icon ${entry.type}`}>{entry.type === "buy" ? "↓" : "↑"}</div>
                     <div className="transaction-main">
                       <div><strong>{entry.itemName}</strong><span className={`type-label ${entry.type}`}>{entry.type === "buy" ? "Bought" : "Sold"}</span></div>
-                      <p>{formatDate(entry.transactionDate)} · {entry.source} · {entry.quantity} × {money.format(entry.unitPriceCents / 100)}{entry.notes ? ` · ${entry.notes}` : ""}</p>
+                      <p>{formatDate(entry.transactionDate)} · {entry.category ?? "Other"} · {entry.source} · {entry.quantity} × {money.format(entry.unitPriceCents / 100)}{entry.notes ? ` · ${entry.notes}` : ""}</p>
                     </div>
                     <div className="transaction-amount">
                       <strong>{entry.type === "buy" ? "−" : "+"}{money.format((entry.quantity * entry.unitPriceCents) / 100)}</strong>

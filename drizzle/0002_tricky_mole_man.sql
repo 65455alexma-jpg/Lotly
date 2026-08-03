@@ -1,0 +1,1 @@
+ALTER TABLE `transactions` ADD `category` text DEFAULT 'Other' NOT NULL;

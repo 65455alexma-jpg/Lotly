@@ -56,7 +56,7 @@ a { color: inherit; }
 .status-success { background: var(--green-soft); color: var(--ink); }
 
 .workspace { max-width: 1400px; margin: 0 auto; padding: 18px 34px 80px; display: grid; grid-template-columns: minmax(320px, .72fr) minmax(600px, 1.7fr); gap: 20px; align-items: start; }
-.entry-panel, .inventory-panel, .history-panel { background: var(--card); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
+.entry-panel, .inventory-panel, .analysis-panel, .history-panel { background: var(--card); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
 .entry-panel { padding: 28px; position: sticky; top: 18px; }
 .section-heading { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
 .section-heading h2 { margin: 0; font: 600 28px/1.1 var(--font-display), serif; letter-spacing: -0.7px; }
@@ -97,7 +97,7 @@ input:focus, select:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba
 .submit-button:disabled { opacity: .55; cursor: wait; }
 
 .content-column { min-width: 0; display: grid; gap: 20px; }
-.inventory-panel, .history-panel { padding: 28px 30px; }
+.inventory-panel, .analysis-panel, .history-panel { padding: 28px 30px; }
 .inline-heading { align-items: center; }
 .item-count { font-size: 11px; color: var(--ink-soft); border: 1px solid var(--line); border-radius: 999px; padding: 7px 10px; }
 .empty-state { min-height: 255px; border: 1px dashed var(--line); border-radius: 14px; background: #faf8f2; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; }
@@ -115,6 +115,25 @@ input:focus, select:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba
 .inventory-table td small { color: var(--ink-soft); font-size: 10px; margin-top: 2px; }
 .item-avatar { width: 34px; height: 34px; flex: 0 0 auto; border-radius: 10px; background: var(--yellow-soft); display: grid; place-items: center; font: 600 15px/1 var(--font-display), serif; }
 .inventory-table .profit { color: #247260; font-weight: 800; }
+
+.analysis-empty { min-height: 120px; border-top: 1px solid #e8e3d9; display: grid; place-items: center; align-content: center; text-align: center; color: var(--ink-soft); font-size: 13px; }
+.analysis-empty span { color: var(--yellow); font-size: 25px; }
+.analysis-empty p { max-width: 350px; margin: 7px 0 0; }
+.analysis-list { border-top: 1px solid #e8e3d9; }
+.category-row { position: relative; display: grid; grid-template-columns: minmax(165px, 1fr) 1.55fr; gap: 24px; padding: 17px 0 20px; border-bottom: 1px solid #e8e3d9; }
+.category-row:last-child { border-bottom: 0; }
+.category-name { display: flex; align-items: center; gap: 10px; }
+.category-name > span { width: 36px; height: 36px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; background: var(--yellow-soft); font-size: 18px; }
+.category-name div { display: flex; flex-direction: column; }
+.category-name strong { font-size: 13px; }
+.category-name small { margin-top: 3px; color: var(--ink-soft); font-size: 10px; }
+.category-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.category-metrics div { display: flex; flex-direction: column; }
+.category-metrics span { color: var(--ink-soft); font-size: 9px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; }
+.category-metrics strong { margin-top: 5px; font: 600 16px/1 var(--font-display), serif; }
+.category-metrics .profit { color: #247260; }
+.category-bar { position: absolute; left: 0; right: 0; bottom: 7px; height: 3px; background: #eee9df; overflow: hidden; border-radius: 9px; }
+.category-bar span { display: block; height: 100%; border-radius: inherit; background: var(--yellow); }
 
 .history-heading { gap: 20px; }
 .history-controls { display: flex; gap: 8px; }
@@ -168,7 +187,8 @@ footer a { text-decoration: none; font-weight: 700; }
   .summary-card strong { font-size: 26px; }
   .status-message { margin: 0 18px 14px; }
   .workspace { padding: 10px 18px 54px; gap: 14px; }
-  .entry-panel, .inventory-panel, .history-panel { padding: 22px 18px; border-radius: 16px; }
+  .entry-panel, .inventory-panel, .analysis-panel, .history-panel { padding: 22px 18px; border-radius: 16px; }
+  .category-row { grid-template-columns: 1fr; gap: 13px; }
   .history-heading { align-items: flex-start; flex-direction: column; }
   .history-controls { width: 100%; }
   .search-box { flex: 1; }

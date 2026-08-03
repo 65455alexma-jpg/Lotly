@@ -9,6 +9,7 @@ type TransactionRow = {
   unit_price_cents: number;
   transaction_date: string;
   source: "eBay" | "Vinted" | "Other";
+  category: "Clothing" | "Electronics" | "Home & garden" | "Collectibles" | "Beauty" | "Other";
   notes: string;
   created_at: string;
 };
@@ -22,6 +23,7 @@ const createTableSql = `
     unit_price_cents INTEGER NOT NULL CHECK(unit_price_cents > 0),
     transaction_date TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT 'Other' CHECK(source IN ('eBay', 'Vinted', 'Other')),
+    category TEXT NOT NULL DEFAULT 'Other',
     notes TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )
@@ -43,6 +45,9 @@ async function prepareDatabase() {
   if (!columns.results.some((column) => column.name === "source")) {
     await db.prepare("ALTER TABLE transactions ADD COLUMN source TEXT NOT NULL DEFAULT 'Other'").run();
   }
+  if (!columns.results.some((column) => column.name === "category")) {
+    await db.prepare("ALTER TABLE transactions ADD COLUMN category TEXT NOT NULL DEFAULT 'Other'").run();
+  }
   return db;
 }
 
@@ -55,6 +60,7 @@ function serialize(row: TransactionRow) {
     unitPriceCents: row.unit_price_cents,
     transactionDate: row.transaction_date,
     source: row.source ?? "Other",
+    category: row.category ?? "Other",
     notes: row.notes,
     createdAt: row.created_at,
   };
@@ -64,7 +70,7 @@ export async function GET() {
   try {
     const db = await prepareDatabase();
     const result = await db
-      .prepare("SELECT id, type, item_name, quantity, unit_price_cents, transaction_date, source, notes, created_at FROM transactions ORDER BY transaction_date DESC, id DESC")
+      .prepare("SELECT id, type, item_name, quantity, unit_price_cents, transaction_date, source, category, notes, created_at FROM transactions ORDER BY transaction_date DESC, id DESC")
       .all<TransactionRow>();
     return NextResponse.json({ transactions: result.results.map(serialize) });
   } catch {
@@ -81,9 +87,10 @@ export async function POST(request: NextRequest) {
     const unitPrice = Number(input.unitPrice);
     const transactionDate = String(input.transactionDate ?? "");
     const source = input.source;
+    const category = input.category;
     const notes = String(input.notes ?? "").trim();
 
-    if ((type !== "buy" && type !== "sell") || (source !== "eBay" && source !== "Vinted" && source !== "Other") || !itemName || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(transactionDate)) {
+    if ((type !== "buy" && type !== "sell") || (source !== "eBay" && source !== "Vinted" && source !== "Other") || !["Clothing", "Electronics", "Home & garden", "Collectibles", "Beauty", "Other"].includes(String(category)) || !itemName || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(transactionDate)) {
       return NextResponse.json({ error: "Please complete all required fields with valid values." }, { status: 400 });
     }
     if (itemName.length > 80 || notes.length > 160) {
@@ -102,8 +109,8 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await db
-      .prepare("INSERT INTO transactions (type, item_name, quantity, unit_price_cents, transaction_date, source, notes) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, type, item_name, quantity, unit_price_cents, transaction_date, source, notes, created_at")
-      .bind(type, itemName, quantity, Math.round(unitPrice * 100), transactionDate, source, notes)
+      .prepare("INSERT INTO transactions (type, item_name, quantity, unit_price_cents, transaction_date, source, category, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, type, item_name, quantity, unit_price_cents, transaction_date, source, category, notes, created_at")
+      .bind(type, itemName, quantity, Math.round(unitPrice * 100), transactionDate, source, category, notes)
       .first<TransactionRow>();
 
     if (!result) throw new Error("Insert failed");
@@ -121,7 +128,7 @@ export async function DELETE(request: NextRequest) {
     }
     const db = await prepareDatabase();
     const transaction = await db
-      .prepare("SELECT id, type, item_name, quantity, unit_price_cents, transaction_date, source, notes, created_at FROM transactions WHERE id = ?")
+      .prepare("SELECT id, type, item_name, quantity, unit_price_cents, transaction_date, source, category, notes, created_at FROM transactions WHERE id = ?")
       .bind(id)
       .first<TransactionRow>();
     if (!transaction) {
