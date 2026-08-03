@@ -31,6 +31,11 @@ type DraftPriceEdit = {
   unitPrice: string;
 };
 
+type SelectedItem = {
+  key: string;
+  name: string;
+};
+
 type InventoryRow = {
   key: string;
   name: string;
@@ -195,6 +200,7 @@ export default function TrackerApp() {
   const [savingSell, setSavingSell] = useState(false);
   const [priceEdit, setPriceEdit] = useState<DraftPriceEdit | null>(null);
   const [savingPriceEdit, setSavingPriceEdit] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const screenshotInput = useRef<HTMLInputElement>(null);
 
   async function loadTransactions() {
@@ -300,6 +306,13 @@ export default function TrackerApp() {
           entry.notes.toLowerCase().includes(query)),
     );
   }, [filter, search, transactions]);
+
+  const selectedItemTransactions = useMemo(() => {
+    if (!selectedItem) return [];
+    return transactions
+      .filter((entry) => entry.itemName.trim().toLowerCase() === selectedItem.key)
+      .sort((a, b) => b.transactionDate.localeCompare(a.transactionDate) || b.id - a.id);
+  }, [selectedItem, transactions]);
 
   const totalEntry = (Number(quantity) || 0) * (Number(unitPrice) || 0);
   const thisMonth = localDate().slice(0, 7);
@@ -790,11 +803,11 @@ export default function TrackerApp() {
                   <tbody>
                     {inventory.map((item) => (
                       <tr key={item.name}>
-                        <td><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
-                        <td><span className="item-number">{item.onHand}</span></td>
-                        <td>{money.format(item.averageCost / 100)}</td>
-                        <td>{money.format(item.revenue / 100)}</td>
-                        <td className={item.profit < 0 ? "negative" : "profit"}>{money.format(item.profit / 100)}</td>
+                        <td><button type="button" className="inventory-link" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.name}</button><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
+                        <td><button type="button" className="item-number item-button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.onHand}</button></td>
+                        <td><button type="button" className="detail-value" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{money.format(item.averageCost / 100)}</button></td>
+                        <td><button type="button" className="detail-value" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{money.format(item.revenue / 100)}</button></td>
+                        <td><button type="button" className={`detail-value ${item.profit < 0 ? "negative" : "profit"}`} onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{money.format(item.profit / 100)}</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -803,8 +816,8 @@ export default function TrackerApp() {
               <div className="inventory-mobile-list">
                 {inventory.map((item) => (
                   <article className="inventory-mobile-card" key={item.key}>
-                    <div className="mobile-item-head"><strong>{item.name}</strong><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
-                    <div className="mobile-item-stats"><div><span>Number</span><strong>{item.onHand}</strong></div><div><span>Cost</span><strong>{money.format(item.averageCost / 100)}</strong></div><div><span>Sold</span><strong>{money.format(item.revenue / 100)}</strong></div><div><span>Profit</span><strong className={item.profit < 0 ? "negative" : "profit"}>{money.format(item.profit / 100)}</strong></div></div>
+                    <div className="mobile-item-head"><button type="button" className="inventory-link" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.name}</button><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
+                    <div className="mobile-item-stats"><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Number</span><strong>{item.onHand}</strong></button><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Cost</span><strong>{money.format(item.averageCost / 100)}</strong></button><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Sold</span><strong>{money.format(item.revenue / 100)}</strong></button><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Profit</span><strong className={item.profit < 0 ? "negative" : "profit"}>{money.format(item.profit / 100)}</strong></button></div>
                   </article>
                 ))}
               </div>
@@ -895,6 +908,40 @@ export default function TrackerApp() {
           </section>
         </div>
       </section>
+
+      {selectedItem && (
+        <section className="item-drawer" aria-label={`${selectedItem.name} details`}>
+          <div className="item-drawer-head">
+            <div>
+              <span className="eyebrow">ITEM DETAILS</span>
+              <h3>{selectedItem.name}</h3>
+            </div>
+            <button type="button" onClick={() => setSelectedItem(null)}>Close</button>
+          </div>
+          {selectedItemTransactions.length === 0 ? (
+            <div className="item-drawer-empty">No transactions found for this item.</div>
+          ) : (
+            <div className="item-drawer-list">
+              {selectedItemTransactions.map((entry) => (
+                <article className="item-drawer-row" key={entry.id}>
+                  <div className={`transaction-icon ${entry.type}`}>{entry.type === "buy" ? "↓" : "↑"}</div>
+                  <div className="item-drawer-main">
+                    <div>
+                      <strong>{entry.type === "buy" ? "Purchase" : "Sale"}</strong>
+                      <span className={`type-label ${entry.type}`}>{formatDate(entry.transactionDate)}</span>
+                    </div>
+                    <p>{entry.quantity} × {money.format(entry.unitPriceCents / 100)} · {entry.source} · {entry.category}</p>
+                    {entry.notes && <p>{entry.notes}</p>}
+                  </div>
+                  <div className="item-drawer-amount">
+                    <strong>{entry.type === "buy" ? "−" : "+"}{money.format((entry.quantity * entry.unitPriceCents) / 100)}</strong>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <footer><span>LOTLY</span><p>A clearer view of every buy and sell.</p><a href="#top">Back to top ↑</a></footer>
     </main>
