@@ -618,7 +618,7 @@ export default function TrackerApp() {
                 <p>Add your first purchase and it will appear here automatically.</p>
                 <a href="#record">Record a purchase →</a>
               </div>
-            ) : (
+            ) : (<>
               <div className="inventory-table-wrap">
                 <table className="inventory-table">
                   <thead><tr><th>Item</th><th>Status</th><th>On hand</th><th>Avg. cost</th><th>Sales</th><th>Est. profit</th></tr></thead>
@@ -636,7 +636,15 @@ export default function TrackerApp() {
                   </tbody>
                 </table>
               </div>
-            )}
+              <div className="inventory-mobile-list">
+                {inventory.map((item) => (
+                  <article className="inventory-mobile-card" key={item.key}>
+                    <div className="mobile-item-head"><div><span className="item-avatar">{item.name.charAt(0).toUpperCase()}</span><strong>{item.name}</strong><small>{item.bought} bought · {item.sold} sold</small></div><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
+                    <div className="mobile-item-stats"><div><span>On hand</span><strong>{item.onHand}</strong></div><div><span>Avg. cost</span><strong>{money.format(item.averageCost / 100)}</strong></div><div><span>Profit</span><strong className={item.profit < 0 ? "negative" : "profit"}>{money.format(item.profit / 100)}</strong></div></div>
+                  </article>
+                ))}
+              </div>
+            </>)}
           </section>
 
           <section className="analysis-panel">
