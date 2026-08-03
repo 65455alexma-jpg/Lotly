@@ -23,3 +23,10 @@ export const transactions = sqliteTable(
     index("idx_transactions_item").on(table.itemName),
   ],
 );
+
+export const inventoryStatuses = sqliteTable("inventory_statuses", {
+  itemKey: text("item_key").primaryKey(),
+  itemName: text("item_name").notNull(),
+  status: text("status", { enum: ["In stock", "Listed", "On hold", "Sold", "Returned"] }).notNull().default("In stock"),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});

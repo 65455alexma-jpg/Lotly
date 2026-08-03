@@ -115,6 +115,12 @@ input:focus, select:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba
 .inventory-table td small { color: var(--ink-soft); font-size: 10px; margin-top: 2px; }
 .item-avatar { width: 34px; height: 34px; flex: 0 0 auto; border-radius: 10px; background: var(--yellow-soft); display: grid; place-items: center; font: 600 15px/1 var(--font-display), serif; }
 .inventory-table .profit { color: #247260; font-weight: 800; }
+.status-select { width: auto; min-width: 94px; appearance: none; border: 0; border-radius: 999px; padding: 7px 26px 7px 10px; font-size: 10px; font-weight: 800; color: var(--ink); background: var(--yellow-soft); cursor: pointer; }
+.status-select:focus { box-shadow: 0 0 0 3px rgba(23,58,52,.13); }
+.status-listed { background: var(--green-soft); color: #216051; }
+.status-on-hold { background: #ebe2f6; color: #654386; }
+.status-sold { background: #dcebf3; color: #286478; }
+.status-returned { background: var(--coral-soft); color: #944333; }
 
 .analysis-empty { min-height: 120px; border-top: 1px solid #e8e3d9; display: grid; place-items: center; align-content: center; text-align: center; color: var(--ink-soft); font-size: 13px; }
 .analysis-empty span { color: var(--yellow); font-size: 25px; }

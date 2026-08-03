@@ -16,6 +16,7 @@ type Transaction = {
 };
 
 type InventoryRow = {
+  key: string;
   name: string;
   bought: number;
   sold: number;
@@ -25,6 +26,9 @@ type InventoryRow = {
   revenue: number;
   profit: number;
 };
+
+type InventoryStatus = "In stock" | "Listed" | "On hold" | "Sold" | "Returned";
+const inventoryStatuses: InventoryStatus[] = ["In stock", "Listed", "On hold", "Sold", "Returned"];
 
 type ProductCategory = "Clothing" | "Electronics" | "Home & garden" | "Collectibles" | "Beauty" | "Other";
 
@@ -105,6 +109,7 @@ function categoryFromText(text: string): ProductCategory {
 
 export default function TrackerApp() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [itemStatuses, setItemStatuses] = useState<Record<string, InventoryStatus>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -125,10 +130,15 @@ export default function TrackerApp() {
 
   async function loadTransactions() {
     try {
-      const response = await fetch("/api/transactions");
-      if (!response.ok) throw new Error("Could not load your records.");
-      const data = (await response.json()) as { transactions: Transaction[] };
+      const [transactionResponse, statusResponse] = await Promise.all([
+        fetch("/api/transactions"),
+        fetch("/api/inventory-status"),
+      ]);
+      if (!transactionResponse.ok || !statusResponse.ok) throw new Error("Could not load your records.");
+      const data = (await transactionResponse.json()) as { transactions: Transaction[] };
+      const statuses = (await statusResponse.json()) as { statuses: Record<string, InventoryStatus> };
       setTransactions(data.transactions);
+      setItemStatuses(statuses.statuses);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load your records.");
     } finally {
@@ -146,6 +156,7 @@ export default function TrackerApp() {
     for (const transaction of transactions) {
       const key = transaction.itemName.trim().toLowerCase();
       const row = rows.get(key) ?? {
+        key,
         name: transaction.itemName,
         bought: 0,
         sold: 0,
@@ -322,6 +333,25 @@ export default function TrackerApp() {
     setError(data.error || "Could not remove that transaction.");
   }
 
+  async function updateInventoryStatus(item: InventoryRow, status: InventoryStatus) {
+    const priorStatus = itemStatuses[item.key] ?? "In stock";
+    setItemStatuses((current) => ({ ...current, [item.key]: status }));
+    setError("");
+    try {
+      const response = await fetch("/api/inventory-status", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ itemKey: item.key, itemName: item.name, status }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error || "Could not update the item status.");
+      setNotice(`${item.name} is now marked as ${status.toLowerCase()}.`);
+    } catch (statusError) {
+      setItemStatuses((current) => ({ ...current, [item.key]: priorStatus }));
+      setError(statusError instanceof Error ? statusError.message : "Could not update the item status.");
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -485,11 +515,12 @@ export default function TrackerApp() {
             ) : (
               <div className="inventory-table-wrap">
                 <table className="inventory-table">
-                  <thead><tr><th>Item</th><th>On hand</th><th>Avg. cost</th><th>Sales</th><th>Est. profit</th></tr></thead>
+                  <thead><tr><th>Item</th><th>Status</th><th>On hand</th><th>Avg. cost</th><th>Sales</th><th>Est. profit</th></tr></thead>
                   <tbody>
                     {inventory.map((item) => (
                       <tr key={item.name}>
                         <td><span className="item-avatar">{item.name.charAt(0).toUpperCase()}</span><div><strong>{item.name}</strong><small>{item.bought} bought · {item.sold} sold</small></div></td>
+                        <td><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
                         <td><strong>{item.onHand}</strong></td>
                         <td>{money.format(item.averageCost / 100)}</td>
                         <td>{money.format(item.revenue / 100)}</td>
