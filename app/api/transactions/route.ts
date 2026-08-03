@@ -120,6 +120,32 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const input = (await request.json()) as Record<string, unknown>;
+    const id = Number(input.id);
+    const unitPrice = Number(input.unitPrice);
+
+    if (!Number.isInteger(id) || id <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+      return NextResponse.json({ error: "Please choose a valid price." }, { status: 400 });
+    }
+
+    const db = await prepareDatabase();
+    const result = await db
+      .prepare("UPDATE transactions SET unit_price_cents = ? WHERE id = ? RETURNING id, type, item_name, quantity, unit_price_cents, transaction_date, source, category, notes, created_at")
+      .bind(Math.round(unitPrice * 100), id)
+      .first<TransactionRow>();
+
+    if (!result) {
+      return NextResponse.json({ error: "Transaction not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ transaction: serialize(result) });
+  } catch {
+    return NextResponse.json({ error: "Could not update this price." }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const id = Number(request.nextUrl.searchParams.get("id"));

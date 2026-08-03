@@ -99,6 +99,10 @@ a { color: inherit; }
 .batch-save { width: 100%; border: 0; border-radius: 9px; margin-top: 12px; padding: 11px 13px; background: var(--ink); color: white; font-size: 11px; font-weight: 800; cursor: pointer; }
 .batch-save.sell { background: var(--coral); }
 .batch-save:disabled { opacity: .6; cursor: wait; }
+.sell-drawer { margin: 0 0 18px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(180deg, #fffaf2, #fffdf8); }
+.sell-drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.sell-drawer-head strong { display: block; margin-top: 4px; font-size: 14px; }
+.sell-drawer-head button { border: 0; background: transparent; color: var(--ink-soft); font-size: 11px; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 0; }
 .ocr-details { margin-top: 11px; border-top: 1px solid #e4dccb; padding-top: 10px; color: var(--ink-soft); font-size: 10px; line-height: 1.45; }
 .ocr-details summary { cursor: pointer; color: var(--ink); font-weight: 800; }
 .ocr-details p { max-height: 110px; overflow: auto; margin: 8px 0 0; padding: 8px; border-radius: 8px; background: #f6f1e6; white-space: pre-wrap; }
@@ -192,6 +196,10 @@ input:focus, select:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba
 .transaction-amount { text-align: right; }
 .transaction-amount strong { display: block; font: 600 16px/1.2 var(--font-display), serif; }
 .transaction-amount button { border: 0; background: none; padding: 4px 0 0; color: #8da19c; font-size: 9px; cursor: pointer; text-decoration: underline; }
+.price-edit { display: grid; gap: 8px; justify-items: end; min-width: 170px; }
+.price-edit .money-input { width: 160px; }
+.price-edit-actions { display: flex; gap: 8px; }
+.price-edit-actions button { padding-top: 0; font-size: 10px; }
 
 footer { max-width: 1332px; margin: 0 auto; padding: 24px 0 40px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; color: var(--ink-soft); font-size: 11px; }
 footer span { font-weight: 900; letter-spacing: 2px; color: var(--ink); }
@@ -224,6 +232,7 @@ footer a { text-decoration: none; font-weight: 700; }
   .screenshot-import { grid-template-columns: auto 1fr; padding: 13px; }
   .screenshot-import button { grid-column: 2; justify-self: start; min-height: 36px; }
   .batch-review { margin-left: -3px; margin-right: -3px; padding: 12px; }
+  .sell-drawer { margin-left: -3px; margin-right: -3px; padding: 12px; }
   .batch-item { padding: 9px; }
   .batch-selects { grid-template-columns: 1fr !important; }
   .inventory-table-wrap { display: none; }
@@ -246,6 +255,7 @@ footer a { text-decoration: none; font-weight: 700; }
   .search-box input { width: 100%; }
   .transaction-row { grid-template-columns: auto 1fr; }
   .transaction-amount { grid-column: 2; text-align: left; margin-top: -8px; }
+  .price-edit { justify-items: start; }
   footer { margin: 0 18px; padding-bottom: 28px; }
   footer p { display: none; }
 }

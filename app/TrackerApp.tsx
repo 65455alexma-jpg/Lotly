@@ -15,6 +15,22 @@ type Transaction = {
   createdAt: string;
 };
 
+type DraftSell = {
+  itemKey: string;
+  priorStatus: InventoryStatus;
+  itemName: string;
+  quantity: string;
+  unitPrice: string;
+  transactionDate: string;
+  source: "eBay" | "Vinted" | "Other";
+  category: ProductCategory;
+};
+
+type DraftPriceEdit = {
+  id: number;
+  unitPrice: string;
+};
+
 type InventoryRow = {
   key: string;
   name: string;
@@ -175,6 +191,10 @@ export default function TrackerApp() {
   const [importedItems, setImportedItems] = useState<ImportedItem[]>([]);
   const [ocrText, setOcrText] = useState("");
   const [savingImport, setSavingImport] = useState(false);
+  const [draftSell, setDraftSell] = useState<DraftSell | null>(null);
+  const [savingSell, setSavingSell] = useState(false);
+  const [priceEdit, setPriceEdit] = useState<DraftPriceEdit | null>(null);
+  const [savingPriceEdit, setSavingPriceEdit] = useState(false);
   const screenshotInput = useRef<HTMLInputElement>(null);
 
   async function loadTransactions() {
@@ -433,8 +453,23 @@ export default function TrackerApp() {
 
   async function updateInventoryStatus(item: InventoryRow, status: InventoryStatus) {
     const priorStatus = itemStatuses[item.key] ?? "In stock";
-    setItemStatuses((current) => ({ ...current, [item.key]: status }));
     setError("");
+    if (status === "Sold") {
+      setItemStatuses((current) => ({ ...current, [item.key]: "Sold" }));
+      setDraftSell({
+        itemKey: item.key,
+        priorStatus,
+        itemName: item.name,
+        quantity: String(Math.max(1, item.onHand || item.sold || 1)),
+        unitPrice: String(Math.max(0, Math.round(item.averageCost) / 100 || 0)),
+        transactionDate: localDate(),
+        source: "eBay",
+        category: "Other",
+      });
+      return;
+    }
+
+    setItemStatuses((current) => ({ ...current, [item.key]: status }));
     try {
       const response = await fetch("/api/inventory-status", {
         method: "PUT",
@@ -447,6 +482,82 @@ export default function TrackerApp() {
     } catch (statusError) {
       setItemStatuses((current) => ({ ...current, [item.key]: priorStatus }));
       setError(statusError instanceof Error ? statusError.message : "Could not update the item status.");
+    }
+  }
+
+  async function saveSoldRecord() {
+    if (!draftSell) return;
+    const quantity = Number(draftSell.quantity);
+    const unitPrice = Number(draftSell.unitPrice);
+    if (!draftSell.itemName.trim() || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+      setError("Please give the sale a name, quantity, and price.");
+      return;
+    }
+
+    setSavingSell(true);
+    setError("");
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "sell",
+          itemName: draftSell.itemName,
+          quantity,
+          unitPrice,
+          transactionDate: draftSell.transactionDate,
+          source: draftSell.source,
+          category: draftSell.category,
+          notes: "Added from inventory status update",
+        }),
+      });
+      const data = (await response.json()) as { transaction?: Transaction; error?: string };
+      if (!response.ok || !data.transaction) throw new Error(data.error || "Could not save the sale.");
+
+      const soldStatusResponse = await fetch("/api/inventory-status", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ itemKey: draftSell.itemKey, itemName: draftSell.itemName, status: "Sold" }),
+      });
+      const statusData = (await soldStatusResponse.json()) as { error?: string };
+      if (!soldStatusResponse.ok) throw new Error(statusData.error || "Could not update the item status.");
+
+      setTransactions((current) => [data.transaction!, ...current]);
+      setItemStatuses((current) => ({ ...current, [draftSell.itemKey]: "Sold" }));
+      setNotice(`${draftSell.itemName} marked as sold and added to the ledger.`);
+      setDraftSell(null);
+    } catch (sellError) {
+      setError(sellError instanceof Error ? sellError.message : "Could not save the sale.");
+    } finally {
+      setSavingSell(false);
+    }
+  }
+
+  async function savePriceEdit() {
+    if (!priceEdit) return;
+    const unitPrice = Number(priceEdit.unitPrice);
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      setError("Please enter a valid price.");
+      return;
+    }
+
+    setSavingPriceEdit(true);
+    setError("");
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: priceEdit.id, unitPrice }),
+      });
+      const data = (await response.json()) as { transaction?: Transaction; error?: string };
+      if (!response.ok || !data.transaction) throw new Error(data.error || "Could not update the price.");
+      setTransactions((current) => current.map((entry) => (entry.id === data.transaction!.id ? data.transaction! : entry)));
+      setNotice("Price updated.");
+      setPriceEdit(null);
+    } catch (priceError) {
+      setError(priceError instanceof Error ? priceError.message : "Could not update the price.");
+    } finally {
+      setSavingPriceEdit(false);
     }
   }
 
@@ -548,6 +659,48 @@ export default function TrackerApp() {
                 {ocrText && <details className="ocr-details"><summary>See the text read from the picture</summary><p>{ocrText}</p></details>}
               </section>
             )}
+            {draftSell && (
+              <section className="sell-drawer" aria-label="Sale details">
+                <div className="sell-drawer-head">
+                  <div>
+                    <span className="eyebrow">MARK AS SOLD</span>
+                    <strong>{draftSell.itemName}</strong>
+                  </div>
+                  <button type="button" onClick={() => {
+                    setItemStatuses((current) => ({ ...current, [draftSell.itemKey]: draftSell.priorStatus }));
+                    setDraftSell(null);
+                  }}>Cancel</button>
+                </div>
+                <div className="form-row">
+                  <label>
+                    <span>Sold quantity</span>
+                    <input type="number" min="0.01" step="0.01" value={draftSell.quantity} onChange={(event) => setDraftSell((current) => current ? { ...current, quantity: event.target.value } : current)} />
+                  </label>
+                  <label>
+                    <span>Sold price</span>
+                    <div className="money-input"><span>£</span><input type="number" min="0.01" step="0.01" value={draftSell.unitPrice} onChange={(event) => setDraftSell((current) => current ? { ...current, unitPrice: event.target.value } : current)} /></div>
+                  </label>
+                </div>
+                <div className="form-row">
+                  <label>
+                    <span>Source</span>
+                    <select value={draftSell.source} onChange={(event) => setDraftSell((current) => current ? { ...current, source: event.target.value as DraftSell["source"] } : current)}>
+                      <option value="eBay">eBay</option>
+                      <option value="Vinted">Vinted</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Sold date</span>
+                    <input type="date" value={draftSell.transactionDate} onChange={(event) => setDraftSell((current) => current ? { ...current, transactionDate: event.target.value } : current)} />
+                  </label>
+                </div>
+                <button type="button" className="batch-save sell" onClick={() => void saveSoldRecord()} disabled={savingSell}>
+                  {savingSell ? "Saving sale…" : "Confirm sold"}
+                </button>
+              </section>
+            )}
+
             <div className="type-switch" role="group" aria-label="Transaction type">
               <button type="button" className={type === "buy" ? "active buy-active" : ""} onClick={() => setType("buy")}>
                 <span>↓</span> Buy
@@ -720,8 +873,21 @@ export default function TrackerApp() {
                       <p>{formatDate(entry.transactionDate)} · {entry.category ?? "Other"} · {entry.source} · {entry.quantity} × {money.format(entry.unitPriceCents / 100)}{entry.notes ? ` · ${entry.notes}` : ""}</p>
                     </div>
                     <div className="transaction-amount">
-                      <strong>{entry.type === "buy" ? "−" : "+"}{money.format((entry.quantity * entry.unitPriceCents) / 100)}</strong>
-                      <button type="button" onClick={() => void removeTransaction(entry.id)} aria-label={`Remove ${entry.itemName} transaction`}>Remove</button>
+                      {priceEdit?.id === entry.id ? (
+                        <div className="price-edit">
+                          <div className="money-input"><span>£</span><input type="number" min="0.01" step="0.01" value={priceEdit.unitPrice} onChange={(event) => setPriceEdit({ ...priceEdit, unitPrice: event.target.value })} aria-label={`Price for ${entry.itemName}`} /></div>
+                          <div className="price-edit-actions">
+                            <button type="button" onClick={() => void savePriceEdit()} disabled={savingPriceEdit}>{savingPriceEdit ? "Saving" : "Save"}</button>
+                            <button type="button" onClick={() => setPriceEdit(null)}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <strong>{entry.type === "buy" ? "−" : "+"}{money.format((entry.quantity * entry.unitPriceCents) / 100)}</strong>
+                          <button type="button" onClick={() => setPriceEdit({ id: entry.id, unitPrice: String(entry.unitPriceCents / 100) })}>Edit price</button>
+                          <button type="button" onClick={() => void removeTransaction(entry.id)} aria-label={`Remove ${entry.itemName} transaction`}>Remove</button>
+                        </>
+                      )}
                     </div>
                   </article>
                 ))}
