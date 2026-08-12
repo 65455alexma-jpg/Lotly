@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { InventoryStatus, listStatuses, setStatus } from "../store";
+import { InventoryStatus, listStatuses, safeErrorMessage, setStatus } from "../store";
 
 export const runtime = "nodejs";
 
@@ -8,8 +8,8 @@ const statuses = ["In stock", "Listed", "On hold", "Sold", "Returned"] as const;
 export async function GET() {
   try {
     return NextResponse.json({ statuses: await listStatuses() });
-  } catch {
-    return NextResponse.json({ error: "Could not load inventory statuses." }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: safeErrorMessage(error, "Could not load inventory statuses.") }, { status: 500 });
   }
 }
 
@@ -25,7 +25,7 @@ export async function PUT(request: NextRequest) {
 
     await setStatus(itemKey, status);
     return NextResponse.json({ itemKey, status });
-  } catch {
-    return NextResponse.json({ error: "Could not update the item status." }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: safeErrorMessage(error, "Could not update the item status.") }, { status: 500 });
   }
 }

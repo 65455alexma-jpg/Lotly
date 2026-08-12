@@ -4,6 +4,7 @@ import {
   availableStock,
   deleteTransaction,
   listTransactions,
+  safeErrorMessage,
   updateTransactionPrice,
 } from "../store";
 
@@ -19,8 +20,8 @@ export async function GET() {
   try {
     const transactions = await listTransactions();
     return NextResponse.json({ transactions: transactions.map(serialize) });
-  } catch {
-    return NextResponse.json({ error: "Could not load transactions." }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: safeErrorMessage(error, "Could not load transactions.") }, { status: 500 });
   }
 }
 
@@ -72,8 +73,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ transaction: serialize(transaction) }, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "Could not save this transaction." }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: safeErrorMessage(error, "Could not save this transaction.") }, { status: 500 });
   }
 }
 
@@ -93,8 +94,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({ transaction: serialize(transaction) });
-  } catch {
-    return NextResponse.json({ error: "Could not update this price." }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: safeErrorMessage(error, "Could not update this price.") }, { status: 500 });
   }
 }
 
@@ -119,7 +120,7 @@ export async function DELETE(request: NextRequest) {
 
     await deleteTransaction(id);
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "Could not remove this transaction." }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: safeErrorMessage(error, "Could not remove this transaction.") }, { status: 500 });
   }
 }

@@ -51,6 +51,14 @@ type SupabaseStatusRow = {
   status: InventoryStatus;
 };
 
+export function safeErrorMessage(error: unknown, fallback: string) {
+  if (!(error instanceof Error)) return fallback;
+  return error.message
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [hidden]")
+    .replace(/sb_secret_[A-Za-z0-9._-]+/g, "sb_secret_[hidden]")
+    .replace(/eyJ[A-Za-z0-9._-]+/g, "[hidden key]");
+}
+
 function fromSupabaseTransaction(row: SupabaseTransactionRow): TransactionRecord {
   return {
     id: row.id,
@@ -75,9 +83,7 @@ async function supabaseRequest<T>(path: string, init: RequestInit = {}): Promise
     apikey: supabaseServiceRoleKey,
   };
 
-  if (!supabaseServiceRoleKey.startsWith("sb_secret_")) {
-    authHeaders.Authorization = `Bearer ${supabaseServiceRoleKey}`;
-  }
+  authHeaders.Authorization = `Bearer ${supabaseServiceRoleKey}`;
 
   const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
     ...init,
