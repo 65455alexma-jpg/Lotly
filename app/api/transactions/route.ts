@@ -9,7 +9,7 @@ import {
 
 export const runtime = "nodejs";
 
-const categories = ["Clothing", "Electronics", "Home & garden", "Collectibles", "Beauty", "Other"] as const;
+const categories = ["Cloth", "Bag", "Watch"] as const;
 
 function serialize(transaction: Awaited<ReturnType<typeof addTransaction>>) {
   return transaction;

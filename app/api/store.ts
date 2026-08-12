@@ -9,7 +9,7 @@ export type TransactionRecord = {
   unitPriceCents: number;
   transactionDate: string;
   source: "eBay" | "Vinted" | "Other";
-  category: "Clothing" | "Electronics" | "Home & garden" | "Collectibles" | "Beauty" | "Other";
+  category: "Cloth" | "Bag" | "Watch";
   notes: string;
   createdAt: string;
 };

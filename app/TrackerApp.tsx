@@ -56,7 +56,7 @@ type InventoryRow = {
 type InventoryStatus = "In stock" | "Listed" | "On hold" | "Sold" | "Returned";
 const inventoryStatuses: InventoryStatus[] = ["In stock", "Listed", "On hold", "Sold", "Returned"];
 
-type ProductCategory = "Clothing" | "Electronics" | "Home & garden" | "Collectibles" | "Beauty" | "Other";
+type ProductCategory = "Cloth" | "Bag" | "Watch";
 
 type ImportedItem = {
   id: string;
@@ -69,7 +69,7 @@ type ImportedItem = {
   category: ProductCategory;
 };
 
-const categories: ProductCategory[] = ["Clothing", "Electronics", "Home & garden", "Collectibles", "Beauty", "Other"];
+const categories: ProductCategory[] = ["Cloth", "Bag", "Watch"];
 
 const money = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -128,12 +128,10 @@ function isItemName(line: string) {
 }
 
 function categoryFromText(text: string): ProductCategory {
-  if (/dress|jacket|shirt|shoe|trainer|jeans|bag|clothing|hoodie|coat/i.test(text)) return "Clothing";
-  if (/phone|ipad|iphone|laptop|camera|console|headphone|charger|electronic/i.test(text)) return "Electronics";
-  if (/vase|lamp|chair|table|plant|kitchen|garden|cushion|home/i.test(text)) return "Home & garden";
-  if (/vintage|rare|figure|card|comic|collectible|stamp|trading card/i.test(text)) return "Collectibles";
-  if (/makeup|skincare|perfume|beauty|lipstick|foundation/i.test(text)) return "Beauty";
-  return "Other";
+  if (/bag|handbag|tote|wallet|purse|clutch|satchel|shoulder bag|crossbody/i.test(text)) return "Bag";
+  if (/watch|wristwatch|timepiece|rolex|seiko|casio|omega/i.test(text)) return "Watch";
+  if (/dress|jacket|shirt|shoe|trainer|jeans|clothing|hoodie|coat|skirt|top|trouser|blouse/i.test(text)) return "Cloth";
+  return "Bag";
 }
 
 function itemsFromText(text: string): ImportedItem[] {
@@ -179,7 +177,7 @@ export default function TrackerApp() {
   const [unitPrice, setUnitPrice] = useState("");
   const [date, setDate] = useState(localDate());
   const [source, setSource] = useState<"eBay" | "Vinted" | "Other">("eBay");
-  const [category, setCategory] = useState<ProductCategory>("Clothing");
+  const [category, setCategory] = useState<ProductCategory>("Cloth");
   const [notes, setNotes] = useState("");
   const [mainTab, setMainTab] = useState<MainTab>("Inventory");
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<"all" | ProductCategory>("all");
@@ -229,7 +227,7 @@ export default function TrackerApp() {
       const row = rows.get(key) ?? {
         key,
         name: transaction.itemName,
-        category: transaction.category ?? "Other",
+        category: transaction.category ?? "Bag",
         bought: 0,
         sold: 0,
         onHand: 0,
@@ -240,7 +238,7 @@ export default function TrackerApp() {
         firstDate: transaction.transactionDate,
         lastDate: transaction.transactionDate,
       };
-      row.category = row.category ?? transaction.category ?? "Other";
+      row.category = row.category ?? transaction.category ?? "Bag";
       row.firstDate = row.firstDate < transaction.transactionDate ? row.firstDate : transaction.transactionDate;
       row.lastDate = row.lastDate > transaction.transactionDate ? row.lastDate : transaction.transactionDate;
 
@@ -504,7 +502,7 @@ export default function TrackerApp() {
       setQuantity("1");
       setUnitPrice("");
       setSource("eBay");
-      setCategory("Clothing");
+      setCategory("Cloth");
       setNotes("");
       setNotice(type === "buy" ? "Purchase recorded." : "Sale recorded.");
     } catch (saveError) {
@@ -539,7 +537,7 @@ export default function TrackerApp() {
         unitPrice: String(Math.max(0, Math.round(item.averageCost) / 100 || 0)),
         transactionDate: localDate(),
         source: "eBay",
-        category: "Other",
+        category: "Bag",
       });
       return;
     }

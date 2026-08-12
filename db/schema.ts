@@ -11,7 +11,7 @@ export const transactions = sqliteTable(
     unitPriceCents: integer("unit_price_cents").notNull(),
     transactionDate: text("transaction_date").notNull(),
     source: text("source", { enum: ["eBay", "Vinted", "Other"] }).notNull().default("Other"),
-    category: text("category", { enum: ["Clothing", "Electronics", "Home & garden", "Collectibles", "Beauty", "Other"] }).notNull().default("Other"),
+    category: text("category", { enum: ["Cloth", "Bag", "Watch"] }).notNull().default("Bag"),
     notes: text("notes").notNull().default(""),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
