@@ -634,6 +634,11 @@ export default function TrackerApp() {
     }
   }
 
+  async function logout() {
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "/login";
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -644,6 +649,7 @@ export default function TrackerApp() {
         <div className="header-actions">
           <span className="currency-pill">GBP · £</span>
           <a href="#record" className="header-button">+ Add transaction</a>
+          <button type="button" className="logout-button" onClick={() => void logout()}>Log out</button>
         </div>
       </header>
 
