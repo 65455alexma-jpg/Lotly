@@ -183,6 +183,32 @@ export async function updateTransactionPrice(id: number, unitPriceCents: number)
   return transaction;
 }
 
+export async function updateTransaction(id: number, input: Omit<TransactionRecord, "id" | "createdAt">) {
+  if (useSupabase) {
+    const rows = await supabaseRequest<SupabaseTransactionRow[]>(`lotly_transactions?id=eq.${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        type: input.type,
+        item_name: input.itemName,
+        quantity: input.quantity,
+        unit_price_cents: input.unitPriceCents,
+        transaction_date: input.transactionDate,
+        source: input.source,
+        category: input.category,
+        notes: input.notes,
+      }),
+    });
+    return rows[0] ? fromSupabaseTransaction(rows[0]) : null;
+  }
+
+  const store = await readStore();
+  const transaction = store.transactions.find((entry) => entry.id === id);
+  if (!transaction) return null;
+  Object.assign(transaction, input);
+  await writeStore(store);
+  return transaction;
+}
+
 export async function deleteTransaction(id: number) {
   if (useSupabase) {
     const rows = await supabaseRequest<SupabaseTransactionRow[]>(`lotly_transactions?id=eq.${id}`, {

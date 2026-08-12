@@ -31,6 +31,18 @@ type DraftPriceEdit = {
   unitPrice: string;
 };
 
+type DraftTransactionEdit = {
+  id: number;
+  type: "buy" | "sell";
+  itemName: string;
+  quantity: string;
+  unitPrice: string;
+  transactionDate: string;
+  source: "eBay" | "Vinted" | "Other";
+  category: ProductCategory;
+  notes: string;
+};
+
 type SelectedItem = {
   key: string;
   name: string;
@@ -194,6 +206,8 @@ export default function TrackerApp() {
   const [savingSell, setSavingSell] = useState(false);
   const [priceEdit, setPriceEdit] = useState<DraftPriceEdit | null>(null);
   const [savingPriceEdit, setSavingPriceEdit] = useState(false);
+  const [transactionEdit, setTransactionEdit] = useState<DraftTransactionEdit | null>(null);
+  const [savingTransactionEdit, setSavingTransactionEdit] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const screenshotInput = useRef<HTMLInputElement>(null);
 
@@ -634,6 +648,60 @@ export default function TrackerApp() {
     }
   }
 
+  function startTransactionEdit(entry: Transaction) {
+    setTransactionEdit({
+      id: entry.id,
+      type: entry.type,
+      itemName: entry.itemName,
+      quantity: String(entry.quantity),
+      unitPrice: String(entry.unitPriceCents / 100),
+      transactionDate: entry.transactionDate,
+      source: entry.source,
+      category: entry.category,
+      notes: entry.notes,
+    });
+  }
+
+  async function saveTransactionEdit() {
+    if (!transactionEdit) return;
+    const quantity = Number(transactionEdit.quantity);
+    const unitPrice = Number(transactionEdit.unitPrice);
+    if (!transactionEdit.itemName.trim() || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+      setError("Please complete the item details with a valid name, quantity, and price.");
+      return;
+    }
+
+    setSavingTransactionEdit(true);
+    setError("");
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: transactionEdit.id,
+          type: transactionEdit.type,
+          itemName: transactionEdit.itemName,
+          quantity,
+          unitPrice,
+          transactionDate: transactionEdit.transactionDate,
+          source: transactionEdit.source,
+          category: transactionEdit.category,
+          notes: transactionEdit.notes,
+        }),
+      });
+      const data = (await response.json()) as { transaction?: Transaction; error?: string };
+      if (!response.ok || !data.transaction) throw new Error(data.error || "Could not update the item details.");
+      setTransactions((current) => current.map((entry) => (entry.id === data.transaction!.id ? data.transaction! : entry)));
+      setNotice("Item details updated.");
+      setSelectedItem({ key: data.transaction.itemName.trim().toLowerCase(), name: data.transaction.itemName });
+      setTransactionEdit(null);
+    } catch (editError) {
+      setError(editError instanceof Error ? editError.message : "Could not update the item details.");
+    } finally {
+      setSavingTransactionEdit(false);
+    }
+  }
+
   async function logout() {
     await fetch("/api/logout", { method: "POST" });
     window.location.href = "/login";
@@ -969,6 +1037,7 @@ export default function TrackerApp() {
                     <article className="tab-transaction-row" key={entry.id}>
                       <div>
                         <strong>{entry.itemName}</strong>
+                        <button type="button" className="row-edit-button inline-edit" onClick={() => startTransactionEdit(entry)}>Edit</button>
                         <p>{formatDate(entry.transactionDate)} · {entry.category} · {entry.source} · {entry.quantity} x {money.format(entry.unitPriceCents / 100)}{entry.notes ? ` · ${entry.notes}` : ""}</p>
                       </div>
                       <strong className={entry.type === "buy" ? "negative" : "profit"}>
@@ -983,6 +1052,70 @@ export default function TrackerApp() {
 
         </div>
       </section>
+
+      {transactionEdit && (
+        <div className="item-modal-backdrop" role="presentation" onClick={() => setTransactionEdit(null)}>
+          <section className="item-modal edit-modal" role="dialog" aria-modal="true" aria-label="Edit item details" onClick={(event) => event.stopPropagation()}>
+            <div className="item-drawer-head">
+              <div>
+                <span className="eyebrow">EDIT DETAILS</span>
+                <h3>{transactionEdit.itemName}</h3>
+              </div>
+              <button type="button" onClick={() => setTransactionEdit(null)}>Close</button>
+            </div>
+            <div className="edit-grid">
+              <label>
+                <span>Type</span>
+                <select value={transactionEdit.type} onChange={(event) => setTransactionEdit((current) => current ? { ...current, type: event.target.value as DraftTransactionEdit["type"] } : current)}>
+                  <option value="buy">Bought</option>
+                  <option value="sell">Sold</option>
+                </select>
+              </label>
+              <label className="edit-wide">
+                <span>Item name</span>
+                <input value={transactionEdit.itemName} onChange={(event) => setTransactionEdit((current) => current ? { ...current, itemName: event.target.value } : current)} maxLength={80} />
+              </label>
+              <label>
+                <span>Quantity</span>
+                <input type="number" min="0.01" step="0.01" value={transactionEdit.quantity} onChange={(event) => setTransactionEdit((current) => current ? { ...current, quantity: event.target.value } : current)} />
+              </label>
+              <label>
+                <span>Price per unit</span>
+                <div className="money-input"><span>£</span><input type="number" min="0.01" step="0.01" value={transactionEdit.unitPrice} onChange={(event) => setTransactionEdit((current) => current ? { ...current, unitPrice: event.target.value } : current)} /></div>
+              </label>
+              <label>
+                <span>Date</span>
+                <input type="date" value={transactionEdit.transactionDate} onChange={(event) => setTransactionEdit((current) => current ? { ...current, transactionDate: event.target.value } : current)} />
+              </label>
+              <label>
+                <span>Source</span>
+                <select value={transactionEdit.source} onChange={(event) => setTransactionEdit((current) => current ? { ...current, source: event.target.value as DraftTransactionEdit["source"] } : current)}>
+                  <option value="eBay">eBay</option>
+                  <option value="Vinted">Vinted</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+              <label>
+                <span>Product type</span>
+                <select value={transactionEdit.category} onChange={(event) => setTransactionEdit((current) => current ? { ...current, category: event.target.value as ProductCategory } : current)}>
+                  {categories.map((option) => <option value={option} key={option}>{option}</option>)}
+                </select>
+              </label>
+              <label className="edit-wide">
+                <span>Note <em>optional</em></span>
+                <input value={transactionEdit.notes} onChange={(event) => setTransactionEdit((current) => current ? { ...current, notes: event.target.value } : current)} maxLength={160} />
+              </label>
+            </div>
+            <div className="edit-actions">
+              <button type="button" className="secondary-button" onClick={() => setTransactionEdit(null)}>Cancel</button>
+              <button type="button" className="submit-button" onClick={() => void saveTransactionEdit()} disabled={savingTransactionEdit}>
+                <span>{savingTransactionEdit ? "Saving…" : "Save changes"}</span>
+                <span>→</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {selectedItem && (
         <div className="item-modal-backdrop" role="presentation" onClick={() => setSelectedItem(null)}>
@@ -1011,6 +1144,7 @@ export default function TrackerApp() {
                       <div>
                         <strong>{entry.type === "buy" ? "Purchase" : "Sale"}</strong>
                         <span className={`type-label ${entry.type}`}>{formatDate(entry.transactionDate)}</span>
+                        <button type="button" className="row-edit-button" onClick={() => startTransactionEdit(entry)}>Edit</button>
                       </div>
                       <p>{entry.quantity} × {money.format(entry.unitPriceCents / 100)} · {entry.source} · {entry.category}</p>
                       {entry.notes && <p>{entry.notes}</p>}

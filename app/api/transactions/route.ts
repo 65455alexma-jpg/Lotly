@@ -5,6 +5,7 @@ import {
   deleteTransaction,
   listTransactions,
   safeErrorMessage,
+  updateTransaction,
   updateTransactionPrice,
 } from "../store";
 
@@ -82,13 +83,62 @@ export async function PATCH(request: NextRequest) {
   try {
     const input = (await request.json()) as Record<string, unknown>;
     const id = Number(input.id);
-    const unitPrice = Number(input.unitPrice);
+    const hasFullEdit = "itemName" in input || "quantity" in input || "transactionDate" in input || "source" in input || "category" in input || "notes" in input || "type" in input;
 
-    if (!Number.isInteger(id) || id <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
-      return NextResponse.json({ error: "Please choose a valid price." }, { status: 400 });
+    if (!Number.isInteger(id) || id <= 0) {
+      return NextResponse.json({ error: "Transaction not found." }, { status: 404 });
     }
 
-    const transaction = await updateTransactionPrice(id, Math.round(unitPrice * 100));
+    if (!hasFullEdit) {
+      const unitPrice = Number(input.unitPrice);
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+        return NextResponse.json({ error: "Please choose a valid price." }, { status: 400 });
+      }
+
+      const transaction = await updateTransactionPrice(id, Math.round(unitPrice * 100));
+      if (!transaction) {
+        return NextResponse.json({ error: "Transaction not found." }, { status: 404 });
+      }
+
+      return NextResponse.json({ transaction: serialize(transaction) });
+    }
+
+    const type = input.type;
+    const itemName = String(input.itemName ?? "").trim();
+    const quantity = Number(input.quantity);
+    const unitPrice = Number(input.unitPrice);
+    const transactionDate = String(input.transactionDate ?? "");
+    const source = input.source;
+    const category = input.category;
+    const notes = String(input.notes ?? "").trim();
+
+    if (
+      (type !== "buy" && type !== "sell") ||
+      (source !== "eBay" && source !== "Vinted" && source !== "Other") ||
+      !categories.includes(category as (typeof categories)[number]) ||
+      !itemName ||
+      !Number.isFinite(quantity) ||
+      quantity <= 0 ||
+      !Number.isFinite(unitPrice) ||
+      unitPrice <= 0 ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(transactionDate)
+    ) {
+      return NextResponse.json({ error: "Please complete all item details with valid values." }, { status: 400 });
+    }
+    if (itemName.length > 80 || notes.length > 160) {
+      return NextResponse.json({ error: "The item name or note is too long." }, { status: 400 });
+    }
+
+    const transaction = await updateTransaction(id, {
+      type,
+      itemName,
+      quantity,
+      unitPriceCents: Math.round(unitPrice * 100),
+      transactionDate,
+      source,
+      category: category as (typeof categories)[number],
+      notes,
+    });
     if (!transaction) {
       return NextResponse.json({ error: "Transaction not found." }, { status: 404 });
     }
