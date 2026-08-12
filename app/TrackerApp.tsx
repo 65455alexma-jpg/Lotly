@@ -809,39 +809,47 @@ export default function TrackerApp() {
               <span className="item-count">{filteredInventory.length} {filteredInventory.length === 1 ? "item" : "items"}</span>
             </div>
 
-            <div className="inventory-filters" aria-label="Inventory filters">
-              <label>
-                <span>Category</span>
-                <select value={inventoryCategoryFilter} onChange={(event) => setInventoryCategoryFilter(event.target.value as "all" | ProductCategory)}>
-                  <option value="all">All categories</option>
-                  {categories.map((option) => <option value={option} key={option}>{option}</option>)}
-                </select>
-              </label>
-              <label>
-                <span>Min cost</span>
-                <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMinPrice} onChange={(event) => setInventoryMinPrice(event.target.value)} placeholder="0.00" /></div>
-              </label>
-              <label>
-                <span>Max cost</span>
-                <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMaxPrice} onChange={(event) => setInventoryMaxPrice(event.target.value)} placeholder="0.00" /></div>
-              </label>
-              <label>
-                <span>Date from</span>
-                <input type="date" value={inventoryDateFrom} onChange={(event) => setInventoryDateFrom(event.target.value)} />
-              </label>
-              <label>
-                <span>Date to</span>
-                <input type="date" value={inventoryDateTo} onChange={(event) => setInventoryDateTo(event.target.value)} />
-              </label>
-              <button type="button" className="inventory-filter-clear" onClick={() => {
-                setInventoryCategoryFilter("all");
-                setInventoryMinPrice("");
-                setInventoryMaxPrice("");
-                setInventoryDateFrom("");
-                setInventoryDateTo("");
-              }}>
-                Clear filters
-              </button>
+            <div className="inventory-filters">
+              <div className="inventory-filters-head">
+                <div>
+                  <p className="eyebrow">FILTERS</p>
+                  <strong>Category, price, and date</strong>
+                </div>
+                <button type="button" className="inventory-filter-clear" onClick={() => {
+                  setInventoryCategoryFilter("all");
+                  setInventoryMinPrice("");
+                  setInventoryMaxPrice("");
+                  setInventoryDateFrom("");
+                  setInventoryDateTo("");
+                }}>
+                  Clear
+                </button>
+              </div>
+              <div className="inventory-filters-grid" aria-label="Inventory filters">
+                <label>
+                  <span>Category</span>
+                  <select value={inventoryCategoryFilter} onChange={(event) => setInventoryCategoryFilter(event.target.value as "all" | ProductCategory)}>
+                    <option value="all">All categories</option>
+                    {categories.map((option) => <option value={option} key={option}>{option}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Min cost</span>
+                  <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMinPrice} onChange={(event) => setInventoryMinPrice(event.target.value)} placeholder="0.00" /></div>
+                </label>
+                <label>
+                  <span>Max cost</span>
+                  <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMaxPrice} onChange={(event) => setInventoryMaxPrice(event.target.value)} placeholder="0.00" /></div>
+                </label>
+                <label>
+                  <span>Date from</span>
+                  <input type="date" value={inventoryDateFrom} onChange={(event) => setInventoryDateFrom(event.target.value)} />
+                </label>
+                <label>
+                  <span>Date to</span>
+                  <input type="date" value={inventoryDateTo} onChange={(event) => setInventoryDateTo(event.target.value)} />
+                </label>
+              </div>
             </div>
 
             {loading ? (
