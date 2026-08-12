@@ -36,7 +36,7 @@ a { color: inherit; }
 .hero h1 { margin: 0; max-width: 820px; font: 600 clamp(43px, 6.2vw, 82px)/.96 var(--font-display), serif; letter-spacing: -3.5px; }
 .hero h1 span { font-style: italic; font-weight: 450; color: var(--coral); }
 .hero-copy { margin: 26px 0 0; max-width: 640px; font-size: 17px; line-height: 1.6; color: var(--ink-soft); }
-.summary-grid { max-width: 1400px; margin: 0 auto; padding: 0 34px 26px; display: grid; grid-template-columns: 1.25fr repeat(3, 1fr); gap: 12px; }
+.summary-grid { max-width: 1400px; margin: 0 auto; padding: 28px 34px 26px; display: grid; grid-template-columns: 1.25fr repeat(3, 1fr); gap: 12px; }
 .summary-card { min-height: 142px; background: rgba(255,253,248,.72); border: 1px solid var(--line); border-radius: 18px; padding: 23px 24px; display: flex; flex-direction: column; justify-content: space-between; }
 .summary-card.accent-card { background: var(--ink); color: white; border-color: var(--ink); }
 .summary-card p { margin: 0; font-size: 12px; color: var(--ink-soft); font-weight: 700; }

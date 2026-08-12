@@ -649,16 +649,6 @@ export default function TrackerApp() {
         </div>
       </header>
 
-      <section className="hero" id="top">
-        <div>
-          <p className="eyebrow">YOUR TRADING LEDGER</p>
-          <h1>Know what you bought.<br /><span>Know what you earned.</span></h1>
-          <p className="hero-copy">
-            A simple record of every purchase and sale, with your stock and estimated profit worked out for you.
-          </p>
-        </div>
-      </section>
-
       <section className="summary-grid" aria-label="Financial summary">
         <article className="summary-card accent-card">
           <p>Estimated profit</p>
