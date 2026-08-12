@@ -56,16 +56,6 @@ const inventoryStatuses: InventoryStatus[] = ["In stock", "Listed", "On hold", "
 
 type ProductCategory = "Clothing" | "Electronics" | "Home & garden" | "Collectibles" | "Beauty" | "Other";
 
-type CategoryRow = {
-  name: ProductCategory;
-  bought: number;
-  sold: number;
-  onHand: number;
-  cost: number;
-  revenue: number;
-  profit: number;
-};
-
 type ImportedItem = {
   id: string;
   selected: boolean;
@@ -78,9 +68,6 @@ type ImportedItem = {
 };
 
 const categories: ProductCategory[] = ["Clothing", "Electronics", "Home & garden", "Collectibles", "Beauty", "Other"];
-const categoryMarks: Record<ProductCategory, string> = {
-  Clothing: "◒", Electronics: "▣", "Home & garden": "⌂", Collectibles: "◇", Beauty: "✦", Other: "○",
-};
 
 const money = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -192,8 +179,6 @@ export default function TrackerApp() {
   const [source, setSource] = useState<"eBay" | "Vinted" | "Other">("eBay");
   const [category, setCategory] = useState<ProductCategory>("Clothing");
   const [notes, setNotes] = useState("");
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "buy" | "sell">("all");
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<"all" | ProductCategory>("all");
   const [inventoryMinPrice, setInventoryMinPrice] = useState("");
   const [inventoryMaxPrice, setInventoryMaxPrice] = useState("");
@@ -301,38 +286,6 @@ export default function TrackerApp() {
     const units = inventory.reduce((sum, item) => sum + Math.max(0, item.onHand), 0);
     return { purchaseSpend, revenue, inventoryValue, profit, units };
   }, [inventory, transactions]);
-
-  const categoryAnalytics = useMemo<CategoryRow[]>(() => {
-    const rows = new Map<ProductCategory, CategoryRow>();
-    for (const transaction of transactions) {
-      const key = transaction.category ?? "Other";
-      const row = rows.get(key) ?? { name: key, bought: 0, sold: 0, onHand: 0, cost: 0, revenue: 0, profit: 0 };
-      if (transaction.type === "buy") {
-        row.bought += transaction.quantity;
-        row.cost += transaction.quantity * transaction.unitPriceCents;
-      } else {
-        row.sold += transaction.quantity;
-        row.revenue += transaction.quantity * transaction.unitPriceCents;
-      }
-      row.onHand = row.bought - row.sold;
-      row.profit = row.revenue - (row.bought ? (row.sold * row.cost) / row.bought : 0);
-      rows.set(key, row);
-    }
-    return Array.from(rows.values()).sort((a, b) => b.revenue - a.revenue || b.profit - a.profit);
-  }, [transactions]);
-
-  const highestCategoryRevenue = Math.max(1, ...categoryAnalytics.map((row) => row.revenue));
-
-  const visibleTransactions = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return transactions.filter(
-      (entry) =>
-        (filter === "all" || entry.type === filter) &&
-        (!query ||
-          entry.itemName.toLowerCase().includes(query) ||
-          entry.notes.toLowerCase().includes(query)),
-    );
-  }, [filter, search, transactions]);
 
   const selectedItemTransactions = useMemo(() => {
     if (!selectedItem) return [];
@@ -890,88 +843,6 @@ export default function TrackerApp() {
             </>)}
           </section>
 
-          <section className="analysis-panel">
-            <div className="section-heading inline-heading">
-              <div>
-                <p className="eyebrow">CATEGORY PERFORMANCE</p>
-                <h2>What&apos;s working</h2>
-              </div>
-              <span className="item-count">{categoryAnalytics.length} {categoryAnalytics.length === 1 ? "type" : "types"}</span>
-            </div>
-
-            {categoryAnalytics.length === 0 ? (
-              <div className="analysis-empty"><span>◌</span><p>Choose a product type when you add an item to see category insights here.</p></div>
-            ) : (
-              <div className="analysis-list">
-                {categoryAnalytics.map((row) => {
-                  const margin = row.revenue ? (row.profit / row.revenue) * 100 : 0;
-                  return (
-                    <article className="category-row" key={row.name}>
-                      <div className="category-name"><span>{categoryMarks[row.name]}</span><div><strong>{row.name}</strong><small>{row.onHand} on hand · {row.sold} sold</small></div></div>
-                      <div className="category-metrics"><div><span>Sales</span><strong>{money.format(row.revenue / 100)}</strong></div><div><span>Est. profit</span><strong className={row.profit < 0 ? "negative" : "profit"}>{money.format(row.profit / 100)}</strong></div><div><span>Margin</span><strong className={margin < 0 ? "negative" : ""}>{row.revenue ? `${margin.toFixed(0)}%` : "—"}</strong></div></div>
-                      <div className="category-bar" aria-hidden="true"><span style={{ width: `${(row.revenue / highestCategoryRevenue) * 100}%` }} /></div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          <section className="history-panel">
-            <div className="section-heading inline-heading history-heading">
-              <div>
-                <p className="eyebrow">THE LEDGER</p>
-                <h2>Transaction history</h2>
-              </div>
-              <div className="history-controls">
-                <label className="search-box">
-                  <span aria-hidden="true">⌕</span>
-                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search items" aria-label="Search transactions" />
-                </label>
-                <select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)} aria-label="Filter transactions">
-                  <option value="all">All activity</option>
-                  <option value="buy">Purchases</option>
-                  <option value="sell">Sales</option>
-                </select>
-              </div>
-            </div>
-
-            {visibleTransactions.length === 0 ? (
-              <div className="history-empty">
-                <span>—</span>
-                <p>{transactions.length ? "No transactions match your search." : "Your transaction history will appear here."}</p>
-              </div>
-            ) : (
-              <div className="transaction-list">
-                {visibleTransactions.map((entry) => (
-                  <article className="transaction-row" key={entry.id}>
-                    <div className={`transaction-icon ${entry.type}`}>{entry.type === "buy" ? "↓" : "↑"}</div>
-                    <div className="transaction-main">
-                      <div><strong>{entry.itemName}</strong><span className={`type-label ${entry.type}`}>{entry.type === "buy" ? "Bought" : "Sold"}</span></div>
-                      <p>{formatDate(entry.transactionDate)} · {entry.category ?? "Other"} · {entry.source} · {entry.quantity} × {money.format(entry.unitPriceCents / 100)}{entry.notes ? ` · ${entry.notes}` : ""}</p>
-                    </div>
-                    <div className="transaction-amount">
-                      {priceEdit?.id === entry.id ? (
-                        <div className="price-edit">
-                          <div className="money-input"><span>£</span><input type="number" min="0.01" step="0.01" value={priceEdit.unitPrice} onChange={(event) => setPriceEdit({ ...priceEdit, unitPrice: event.target.value })} aria-label={`Price for ${entry.itemName}`} /></div>
-                          <div className="price-edit-actions">
-                            <button type="button" onClick={() => void savePriceEdit()} disabled={savingPriceEdit}>{savingPriceEdit ? "Saving" : "Save"}</button>
-                            <button type="button" onClick={() => setPriceEdit(null)}>Cancel</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <strong>{entry.type === "buy" ? "−" : "+"}{money.format((entry.quantity * entry.unitPriceCents) / 100)}</strong>
-                          <button type="button" onClick={() => setPriceEdit({ id: entry.id, unitPrice: String(entry.unitPriceCents / 100) })}>Edit price</button>
-                          <button type="button" onClick={() => void removeTransaction(entry.id)} aria-label={`Remove ${entry.itemName} transaction`}>Remove</button>
-                        </>
-                      )}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
         </div>
       </section>
 
