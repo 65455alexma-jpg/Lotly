@@ -287,19 +287,28 @@ export default function TrackerApp() {
   }, [inventory, inventoryCategoryFilter, inventoryDateFrom, inventoryDateTo, inventoryMaxPrice, inventoryMinPrice]);
 
   const totals = useMemo(() => {
+    const averageCostByKey = new Map(inventory.map((item) => [item.key, item.averageCost]));
     const purchaseSpend = transactions
       .filter((entry) => entry.type === "buy")
       .reduce((sum, entry) => sum + entry.quantity * entry.unitPriceCents, 0);
     const revenue = transactions
       .filter((entry) => entry.type === "sell")
       .reduce((sum, entry) => sum + entry.quantity * entry.unitPriceCents, 0);
+    const soldCost = transactions
+      .filter((entry) => entry.type === "sell")
+      .reduce((sum, entry) => sum + entry.quantity * (averageCostByKey.get(entry.itemName.trim().toLowerCase()) ?? 0), 0);
     const inventoryValue = inventory.reduce(
       (sum, item) => sum + Math.max(0, item.onHand) * item.averageCost,
       0,
     );
-    const profit = inventory.reduce((sum, item) => sum + item.profit, 0);
+    const profit = revenue - soldCost;
     const units = inventory.reduce((sum, item) => sum + Math.max(0, item.onHand), 0);
-    return { purchaseSpend, revenue, inventoryValue, profit, units };
+    const soldUnits = transactions.filter((entry) => entry.type === "sell").reduce((sum, entry) => sum + entry.quantity, 0);
+    const boughtUnits = transactions.filter((entry) => entry.type === "buy").reduce((sum, entry) => sum + entry.quantity, 0);
+    const margin = revenue ? Math.round((profit / revenue) * 100) : 0;
+    const roi = soldCost ? Math.round((profit / soldCost) * 100) : 0;
+    const sellThroughRate = boughtUnits ? Math.round((soldUnits / boughtUnits) * 100) : 0;
+    return { boughtUnits, inventoryValue, margin, profit, purchaseSpend, revenue, roi, sellThroughRate, soldCost, soldUnits, units };
   }, [inventory, transactions]);
 
   const boughtTransactions = useMemo(
@@ -723,24 +732,24 @@ export default function TrackerApp() {
 
       <section className="summary-grid" aria-label="Financial summary">
         <article className="summary-card accent-card">
-          <p>Estimated profit</p>
+          <p>Total profit</p>
           <strong className={totals.profit < 0 ? "negative" : ""}>{money.format(totals.profit / 100)}</strong>
-          <span>From completed sales</span>
+          <span>{totals.margin}% margin · {totals.roi}% ROI</span>
         </article>
         <article className="summary-card">
-          <p>Sales revenue</p>
+          <p>Total earned</p>
           <strong>{money.format(totals.revenue / 100)}</strong>
-          <span>{transactions.filter((entry) => entry.type === "sell").length} sale records</span>
+          <span>{totals.soldUnits} units sold</span>
         </article>
         <article className="summary-card">
-          <p>Stock at cost</p>
-          <strong>{money.format(totals.inventoryValue / 100)}</strong>
-          <span>{totals.units} units on hand</span>
-        </article>
-        <article className="summary-card">
-          <p>Total purchased</p>
+          <p>Total spent</p>
           <strong>{money.format(totals.purchaseSpend / 100)}</strong>
-          <span>Across {inventory.length} items</span>
+          <span>{totals.boughtUnits} units bought</span>
+        </article>
+        <article className="summary-card">
+          <p>In stock</p>
+          <strong>{money.format(totals.inventoryValue / 100)}</strong>
+          <span>{totals.units} units · {inventory.length} item types</span>
         </article>
       </section>
 
@@ -979,10 +988,11 @@ export default function TrackerApp() {
 
             <div className="performance-grid" aria-label="Business performance">
               <article><span>{mainTab} shown</span><strong>{performance.activeItems}</strong><small>After filters</small></article>
-              <article><span>Sales revenue</span><strong>{money.format(performance.revenue / 100)}</strong><small>{performance.soldUnits} units sold</small></article>
-              <article><span>Purchase cost</span><strong>{money.format(performance.spend / 100)}</strong><small>{performance.boughtUnits} units bought</small></article>
-              <article><span>Est. profit</span><strong className={performance.profit < 0 ? "negative" : "profit"}>{money.format(performance.profit / 100)}</strong><small>{performance.margin}% margin</small></article>
-              <article><span>Stock value</span><strong>{money.format(performance.inventoryValue / 100)}</strong><small>{performance.onHandUnits} on hand</small></article>
+              <article><span>Total earned</span><strong>{money.format(performance.revenue / 100)}</strong><small>{performance.soldUnits} units sold</small></article>
+              <article><span>Total spent</span><strong>{money.format(performance.spend / 100)}</strong><small>{performance.boughtUnits} units bought</small></article>
+              <article><span>Profit</span><strong className={performance.profit < 0 ? "negative" : "profit"}>{money.format(performance.profit / 100)}</strong><small>{performance.margin}% margin</small></article>
+              <article><span>Margin</span><strong>{performance.margin}%</strong><small>Profit ÷ sales</small></article>
+              <article><span>Stock value</span><strong>{money.format(performance.inventoryValue / 100)}</strong><small>{performance.onHandUnits} units on hand</small></article>
               <article><span>Sell-through</span><strong>{performance.sellThroughRate}%</strong><small>{performance.listedItems} listed now</small></article>
               <article><span>Avg sale</span><strong>{money.format(performance.averageSale / 100)}</strong><small>Per sold unit</small></article>
             </div>
