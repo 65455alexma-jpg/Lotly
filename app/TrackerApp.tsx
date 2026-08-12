@@ -595,11 +595,6 @@ export default function TrackerApp() {
             A simple record of every purchase and sale, with your stock and estimated profit worked out for you.
           </p>
         </div>
-        <div className="hero-stamp" aria-hidden="true">
-          <span>THIS MONTH</span>
-          <strong>{monthlyTransactions}</strong>
-          <small>TRANSACTIONS</small>
-        </div>
       </section>
 
       <section className="summary-grid" aria-label="Financial summary">
@@ -911,37 +906,45 @@ export default function TrackerApp() {
       </section>
 
       {selectedItem && (
-        <section className="item-drawer" aria-label={`${selectedItem.name} details`}>
-          <div className="item-drawer-head">
-            <div>
-              <span className="eyebrow">ITEM DETAILS</span>
-              <h3>{selectedItem.name}</h3>
+        <div className="item-modal-backdrop" role="presentation" onClick={() => setSelectedItem(null)}>
+          <section
+            className="item-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${selectedItem.name} details`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="item-drawer-head">
+              <div>
+                <span className="eyebrow">ITEM DETAILS</span>
+                <h3>{selectedItem.name}</h3>
+              </div>
+              <button type="button" onClick={() => setSelectedItem(null)}>Close</button>
             </div>
-            <button type="button" onClick={() => setSelectedItem(null)}>Close</button>
-          </div>
-          {selectedItemTransactions.length === 0 ? (
-            <div className="item-drawer-empty">No transactions found for this item.</div>
-          ) : (
-            <div className="item-drawer-list">
-              {selectedItemTransactions.map((entry) => (
-                <article className="item-drawer-row" key={entry.id}>
-                  <div className={`transaction-icon ${entry.type}`}>{entry.type === "buy" ? "↓" : "↑"}</div>
-                  <div className="item-drawer-main">
-                    <div>
-                      <strong>{entry.type === "buy" ? "Purchase" : "Sale"}</strong>
-                      <span className={`type-label ${entry.type}`}>{formatDate(entry.transactionDate)}</span>
+            {selectedItemTransactions.length === 0 ? (
+              <div className="item-drawer-empty">No transactions found for this item.</div>
+            ) : (
+              <div className="item-drawer-list">
+                {selectedItemTransactions.map((entry) => (
+                  <article className="item-drawer-row" key={entry.id}>
+                    <div className={`transaction-icon ${entry.type}`}>{entry.type === "buy" ? "↓" : "↑"}</div>
+                    <div className="item-drawer-main">
+                      <div>
+                        <strong>{entry.type === "buy" ? "Purchase" : "Sale"}</strong>
+                        <span className={`type-label ${entry.type}`}>{formatDate(entry.transactionDate)}</span>
+                      </div>
+                      <p>{entry.quantity} × {money.format(entry.unitPriceCents / 100)} · {entry.source} · {entry.category}</p>
+                      {entry.notes && <p>{entry.notes}</p>}
                     </div>
-                    <p>{entry.quantity} × {money.format(entry.unitPriceCents / 100)} · {entry.source} · {entry.category}</p>
-                    {entry.notes && <p>{entry.notes}</p>}
-                  </div>
-                  <div className="item-drawer-amount">
-                    <strong>{entry.type === "buy" ? "−" : "+"}{money.format((entry.quantity * entry.unitPriceCents) / 100)}</strong>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+                    <div className="item-drawer-amount">
+                      <strong>{entry.type === "buy" ? "−" : "+"}{money.format((entry.quantity * entry.unitPriceCents) / 100)}</strong>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       )}
 
       <footer><span>LOTLY</span><p>A clearer view of every buy and sell.</p><a href="#top">Back to top ↑</a></footer>
