@@ -300,6 +300,75 @@ export default function TrackerApp() {
     [transactions],
   );
 
+  const filteredBoughtTransactions = useMemo(() => {
+    const minPrice = Number(inventoryMinPrice);
+    const maxPrice = Number(inventoryMaxPrice);
+    return boughtTransactions.filter((entry) => {
+      const price = entry.unitPriceCents / 100;
+      const categoryMatches = inventoryCategoryFilter === "all" || entry.category === inventoryCategoryFilter;
+      const minMatches = !inventoryMinPrice || Number.isNaN(minPrice) || price >= minPrice;
+      const maxMatches = !inventoryMaxPrice || Number.isNaN(maxPrice) || price <= maxPrice;
+      const fromMatches = !inventoryDateFrom || entry.transactionDate >= inventoryDateFrom;
+      const toMatches = !inventoryDateTo || entry.transactionDate <= inventoryDateTo;
+      return categoryMatches && minMatches && maxMatches && fromMatches && toMatches;
+    });
+  }, [boughtTransactions, inventoryCategoryFilter, inventoryDateFrom, inventoryDateTo, inventoryMaxPrice, inventoryMinPrice]);
+
+  const filteredSoldTransactions = useMemo(() => {
+    const minPrice = Number(inventoryMinPrice);
+    const maxPrice = Number(inventoryMaxPrice);
+    return soldTransactions.filter((entry) => {
+      const price = entry.unitPriceCents / 100;
+      const categoryMatches = inventoryCategoryFilter === "all" || entry.category === inventoryCategoryFilter;
+      const minMatches = !inventoryMinPrice || Number.isNaN(minPrice) || price >= minPrice;
+      const maxMatches = !inventoryMaxPrice || Number.isNaN(maxPrice) || price <= maxPrice;
+      const fromMatches = !inventoryDateFrom || entry.transactionDate >= inventoryDateFrom;
+      const toMatches = !inventoryDateTo || entry.transactionDate <= inventoryDateTo;
+      return categoryMatches && minMatches && maxMatches && fromMatches && toMatches;
+    });
+  }, [soldTransactions, inventoryCategoryFilter, inventoryDateFrom, inventoryDateTo, inventoryMaxPrice, inventoryMinPrice]);
+
+  const performance = useMemo(() => {
+    const filteredKeys = new Set(filteredInventory.map((item) => item.key));
+    const averageCostByKey = new Map(inventory.map((item) => [item.key, item.averageCost]));
+    const revenue = filteredSoldTransactions.reduce((sum, entry) => sum + entry.quantity * entry.unitPriceCents, 0);
+    const spend = filteredBoughtTransactions.reduce((sum, entry) => sum + entry.quantity * entry.unitPriceCents, 0);
+    const soldCost = filteredSoldTransactions.reduce((sum, entry) => {
+      const key = entry.itemName.trim().toLowerCase();
+      return sum + entry.quantity * (averageCostByKey.get(key) ?? 0);
+    }, 0);
+    const profit = revenue - soldCost;
+    const soldUnits = filteredSoldTransactions.reduce((sum, entry) => sum + entry.quantity, 0);
+    const boughtUnits = filteredBoughtTransactions.reduce((sum, entry) => sum + entry.quantity, 0);
+    const onHandUnits = filteredInventory.reduce((sum, item) => sum + Math.max(0, item.onHand), 0);
+    const inventoryValue = filteredInventory.reduce((sum, item) => sum + Math.max(0, item.onHand) * item.averageCost, 0);
+    const activeItems = mainTab === "Inventory"
+      ? filteredInventory.length
+      : mainTab === "Bought"
+        ? filteredBoughtTransactions.length
+        : filteredSoldTransactions.length;
+    const listedItems = filteredInventory.filter((item) => itemStatuses[item.key] === "Listed").length;
+    const soldInventoryRows = inventory.filter((item) => filteredKeys.has(item.key)).reduce((sum, item) => sum + item.sold, 0);
+    const boughtInventoryRows = inventory.filter((item) => filteredKeys.has(item.key)).reduce((sum, item) => sum + item.bought, 0);
+    const sellThroughRate = boughtInventoryRows ? Math.round((soldInventoryRows / boughtInventoryRows) * 100) : 0;
+    const margin = revenue ? Math.round((profit / revenue) * 100) : 0;
+    const averageSale = soldUnits ? revenue / soldUnits : 0;
+    return {
+      activeItems,
+      averageSale,
+      boughtUnits,
+      inventoryValue,
+      listedItems,
+      margin,
+      onHandUnits,
+      profit,
+      revenue,
+      sellThroughRate,
+      spend,
+      soldUnits,
+    };
+  }, [filteredBoughtTransactions, filteredInventory, filteredSoldTransactions, inventory, itemStatuses, mainTab]);
+
   const selectedItemTransactions = useMemo(() => {
     if (!selectedItem) return [];
     return transactions
@@ -774,8 +843,8 @@ export default function TrackerApp() {
               </div>
               <span className="item-count">
                 {mainTab === "Inventory" && `${filteredInventory.length} ${filteredInventory.length === 1 ? "item" : "items"}`}
-                {mainTab === "Bought" && `${boughtTransactions.length} ${boughtTransactions.length === 1 ? "purchase" : "purchases"}`}
-                {mainTab === "Sold" && `${soldTransactions.length} ${soldTransactions.length === 1 ? "sale" : "sales"}`}
+                {mainTab === "Bought" && `${filteredBoughtTransactions.length} ${filteredBoughtTransactions.length === 1 ? "purchase" : "purchases"}`}
+                {mainTab === "Sold" && `${filteredSoldTransactions.length} ${filteredSoldTransactions.length === 1 ? "sale" : "sales"}`}
               </span>
             </div>
 
@@ -794,51 +863,70 @@ export default function TrackerApp() {
               ))}
             </div>
 
+            <div className="inventory-filters">
+              <div className="inventory-filters-head">
+                <div>
+                  <p className="eyebrow">FILTERS</p>
+                  <strong>View, category, price, and date</strong>
+                </div>
+                <button type="button" className="inventory-filter-clear" onClick={() => {
+                  setMainTab("Inventory");
+                  setInventoryCategoryFilter("all");
+                  setInventoryMinPrice("");
+                  setInventoryMaxPrice("");
+                  setInventoryDateFrom("");
+                  setInventoryDateTo("");
+                }}>
+                  Clear
+                </button>
+              </div>
+              <div className="inventory-filters-grid general-filters-grid" aria-label="Business filters">
+                <label>
+                  <span>View</span>
+                  <select value={mainTab} onChange={(event) => setMainTab(event.target.value as MainTab)}>
+                    <option value="Bought">Bought</option>
+                    <option value="Sold">Sold</option>
+                    <option value="Inventory">Inventory</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Category</span>
+                  <select value={inventoryCategoryFilter} onChange={(event) => setInventoryCategoryFilter(event.target.value as "all" | ProductCategory)}>
+                    <option value="all">All categories</option>
+                    {categories.map((option) => <option value={option} key={option}>{option}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Min price</span>
+                  <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMinPrice} onChange={(event) => setInventoryMinPrice(event.target.value)} placeholder="0.00" /></div>
+                </label>
+                <label>
+                  <span>Max price</span>
+                  <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMaxPrice} onChange={(event) => setInventoryMaxPrice(event.target.value)} placeholder="0.00" /></div>
+                </label>
+                <label>
+                  <span>Date from</span>
+                  <input type="date" value={inventoryDateFrom} onChange={(event) => setInventoryDateFrom(event.target.value)} />
+                </label>
+                <label>
+                  <span>Date to</span>
+                  <input type="date" value={inventoryDateTo} onChange={(event) => setInventoryDateTo(event.target.value)} />
+                </label>
+              </div>
+            </div>
+
+            <div className="performance-grid" aria-label="Business performance">
+              <article><span>{mainTab} shown</span><strong>{performance.activeItems}</strong><small>After filters</small></article>
+              <article><span>Sales revenue</span><strong>{money.format(performance.revenue / 100)}</strong><small>{performance.soldUnits} units sold</small></article>
+              <article><span>Purchase cost</span><strong>{money.format(performance.spend / 100)}</strong><small>{performance.boughtUnits} units bought</small></article>
+              <article><span>Est. profit</span><strong className={performance.profit < 0 ? "negative" : "profit"}>{money.format(performance.profit / 100)}</strong><small>{performance.margin}% margin</small></article>
+              <article><span>Stock value</span><strong>{money.format(performance.inventoryValue / 100)}</strong><small>{performance.onHandUnits} on hand</small></article>
+              <article><span>Sell-through</span><strong>{performance.sellThroughRate}%</strong><small>{performance.listedItems} listed now</small></article>
+              <article><span>Avg sale</span><strong>{money.format(performance.averageSale / 100)}</strong><small>Per sold unit</small></article>
+            </div>
+
             {mainTab === "Inventory" && (
               <>
-                <div className="inventory-filters">
-                  <div className="inventory-filters-head">
-                    <div>
-                      <p className="eyebrow">FILTERS</p>
-                      <strong>Category, price, and date</strong>
-                    </div>
-                    <button type="button" className="inventory-filter-clear" onClick={() => {
-                      setInventoryCategoryFilter("all");
-                      setInventoryMinPrice("");
-                      setInventoryMaxPrice("");
-                      setInventoryDateFrom("");
-                      setInventoryDateTo("");
-                    }}>
-                      Clear
-                    </button>
-                  </div>
-                  <div className="inventory-filters-grid" aria-label="Inventory filters">
-                    <label>
-                      <span>Category</span>
-                      <select value={inventoryCategoryFilter} onChange={(event) => setInventoryCategoryFilter(event.target.value as "all" | ProductCategory)}>
-                        <option value="all">All categories</option>
-                        {categories.map((option) => <option value={option} key={option}>{option}</option>)}
-                      </select>
-                    </label>
-                    <label>
-                      <span>Min cost</span>
-                      <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMinPrice} onChange={(event) => setInventoryMinPrice(event.target.value)} placeholder="0.00" /></div>
-                    </label>
-                    <label>
-                      <span>Max cost</span>
-                      <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMaxPrice} onChange={(event) => setInventoryMaxPrice(event.target.value)} placeholder="0.00" /></div>
-                    </label>
-                    <label>
-                      <span>Date from</span>
-                      <input type="date" value={inventoryDateFrom} onChange={(event) => setInventoryDateFrom(event.target.value)} />
-                    </label>
-                    <label>
-                      <span>Date to</span>
-                      <input type="date" value={inventoryDateTo} onChange={(event) => setInventoryDateTo(event.target.value)} />
-                    </label>
-                  </div>
-                </div>
-
                 {loading ? (
                   <div className="empty-state compact"><div className="empty-icon">...</div><h3>Loading your inventory</h3></div>
                 ) : filteredInventory.length === 0 ? (
@@ -880,10 +968,10 @@ export default function TrackerApp() {
 
             {mainTab !== "Inventory" && (
               <div className="tab-transaction-list">
-                {(mainTab === "Bought" ? boughtTransactions : soldTransactions).length === 0 ? (
+                {(mainTab === "Bought" ? filteredBoughtTransactions : filteredSoldTransactions).length === 0 ? (
                   <div className="empty-state compact"><div className="empty-icon">□</div><h3>No {mainTab.toLowerCase()} records yet</h3></div>
                 ) : (
-                  (mainTab === "Bought" ? boughtTransactions : soldTransactions).map((entry) => (
+                  (mainTab === "Bought" ? filteredBoughtTransactions : filteredSoldTransactions).map((entry) => (
                     <article className="tab-transaction-row" key={entry.id}>
                       <div>
                         <strong>{entry.itemName}</strong>
