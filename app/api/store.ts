@@ -71,11 +71,18 @@ async function supabaseRequest<T>(path: string, init: RequestInit = {}): Promise
     throw new Error("Supabase is not configured.");
   }
 
+  const authHeaders: HeadersInit = {
+    apikey: supabaseServiceRoleKey,
+  };
+
+  if (!supabaseServiceRoleKey.startsWith("sb_secret_")) {
+    authHeaders.Authorization = `Bearer ${supabaseServiceRoleKey}`;
+  }
+
   const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
     ...init,
     headers: {
-      apikey: supabaseServiceRoleKey,
-      Authorization: `Bearer ${supabaseServiceRoleKey}`,
+      ...authHeaders,
       "Content-Type": "application/json",
       Prefer: "return=representation",
       ...(init.headers ?? {}),
