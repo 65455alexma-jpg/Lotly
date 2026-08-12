@@ -36,6 +36,8 @@ type SelectedItem = {
   name: string;
 };
 
+type MainTab = "Inventory" | "Bought" | "Sold";
+
 type InventoryRow = {
   key: string;
   name: string;
@@ -179,6 +181,7 @@ export default function TrackerApp() {
   const [source, setSource] = useState<"eBay" | "Vinted" | "Other">("eBay");
   const [category, setCategory] = useState<ProductCategory>("Clothing");
   const [notes, setNotes] = useState("");
+  const [mainTab, setMainTab] = useState<MainTab>("Inventory");
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<"all" | ProductCategory>("all");
   const [inventoryMinPrice, setInventoryMinPrice] = useState("");
   const [inventoryMaxPrice, setInventoryMaxPrice] = useState("");
@@ -286,6 +289,16 @@ export default function TrackerApp() {
     const units = inventory.reduce((sum, item) => sum + Math.max(0, item.onHand), 0);
     return { purchaseSpend, revenue, inventoryValue, profit, units };
   }, [inventory, transactions]);
+
+  const boughtTransactions = useMemo(
+    () => transactions.filter((entry) => entry.type === "buy"),
+    [transactions],
+  );
+
+  const soldTransactions = useMemo(
+    () => transactions.filter((entry) => entry.type === "sell"),
+    [transactions],
+  );
 
   const selectedItemTransactions = useMemo(() => {
     if (!selectedItem) return [];
@@ -757,90 +770,133 @@ export default function TrackerApp() {
             <div className="section-heading inline-heading">
               <div>
                 <p className="eyebrow">CURRENT POSITION</p>
-                <h2>Your inventory</h2>
+                <h2>{mainTab === "Inventory" ? "Your inventory" : mainTab}</h2>
               </div>
-              <span className="item-count">{filteredInventory.length} {filteredInventory.length === 1 ? "item" : "items"}</span>
+              <span className="item-count">
+                {mainTab === "Inventory" && `${filteredInventory.length} ${filteredInventory.length === 1 ? "item" : "items"}`}
+                {mainTab === "Bought" && `${boughtTransactions.length} ${boughtTransactions.length === 1 ? "purchase" : "purchases"}`}
+                {mainTab === "Sold" && `${soldTransactions.length} ${soldTransactions.length === 1 ? "sale" : "sales"}`}
+              </span>
             </div>
 
-            <div className="inventory-filters">
-              <div className="inventory-filters-head">
-                <div>
-                  <p className="eyebrow">FILTERS</p>
-                  <strong>Category, price, and date</strong>
-                </div>
-                <button type="button" className="inventory-filter-clear" onClick={() => {
-                  setInventoryCategoryFilter("all");
-                  setInventoryMinPrice("");
-                  setInventoryMaxPrice("");
-                  setInventoryDateFrom("");
-                  setInventoryDateTo("");
-                }}>
-                  Clear
+            <div className="main-tabs" role="tablist" aria-label="Inventory views">
+              {(["Bought", "Sold", "Inventory"] as MainTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={mainTab === tab}
+                  className={mainTab === tab ? "active" : ""}
+                  onClick={() => setMainTab(tab)}
+                >
+                  {tab}
                 </button>
-              </div>
-              <div className="inventory-filters-grid" aria-label="Inventory filters">
-                <label>
-                  <span>Category</span>
-                  <select value={inventoryCategoryFilter} onChange={(event) => setInventoryCategoryFilter(event.target.value as "all" | ProductCategory)}>
-                    <option value="all">All categories</option>
-                    {categories.map((option) => <option value={option} key={option}>{option}</option>)}
-                  </select>
-                </label>
-                <label>
-                  <span>Min cost</span>
-                  <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMinPrice} onChange={(event) => setInventoryMinPrice(event.target.value)} placeholder="0.00" /></div>
-                </label>
-                <label>
-                  <span>Max cost</span>
-                  <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMaxPrice} onChange={(event) => setInventoryMaxPrice(event.target.value)} placeholder="0.00" /></div>
-                </label>
-                <label>
-                  <span>Date from</span>
-                  <input type="date" value={inventoryDateFrom} onChange={(event) => setInventoryDateFrom(event.target.value)} />
-                </label>
-                <label>
-                  <span>Date to</span>
-                  <input type="date" value={inventoryDateTo} onChange={(event) => setInventoryDateTo(event.target.value)} />
-                </label>
-              </div>
+              ))}
             </div>
 
-            {loading ? (
-              <div className="empty-state compact"><div className="empty-icon">···</div><h3>Loading your inventory</h3></div>
-            ) : filteredInventory.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">□</div>
-                <h3>No items match your filters</h3>
-                <p>Try widening the category, price, or date range.</p>
-                <a href="#record">Record a purchase →</a>
-              </div>
-            ) : (<>
-              <div className="inventory-table-wrap">
-                <table className="inventory-table">
-                  <thead><tr><th>Item</th><th>Status</th><th>Number</th><th>Cost</th><th>Sold</th><th>Profit</th></tr></thead>
-                  <tbody>
+            {mainTab === "Inventory" && (
+              <>
+                <div className="inventory-filters">
+                  <div className="inventory-filters-head">
+                    <div>
+                      <p className="eyebrow">FILTERS</p>
+                      <strong>Category, price, and date</strong>
+                    </div>
+                    <button type="button" className="inventory-filter-clear" onClick={() => {
+                      setInventoryCategoryFilter("all");
+                      setInventoryMinPrice("");
+                      setInventoryMaxPrice("");
+                      setInventoryDateFrom("");
+                      setInventoryDateTo("");
+                    }}>
+                      Clear
+                    </button>
+                  </div>
+                  <div className="inventory-filters-grid" aria-label="Inventory filters">
+                    <label>
+                      <span>Category</span>
+                      <select value={inventoryCategoryFilter} onChange={(event) => setInventoryCategoryFilter(event.target.value as "all" | ProductCategory)}>
+                        <option value="all">All categories</option>
+                        {categories.map((option) => <option value={option} key={option}>{option}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Min cost</span>
+                      <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMinPrice} onChange={(event) => setInventoryMinPrice(event.target.value)} placeholder="0.00" /></div>
+                    </label>
+                    <label>
+                      <span>Max cost</span>
+                      <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMaxPrice} onChange={(event) => setInventoryMaxPrice(event.target.value)} placeholder="0.00" /></div>
+                    </label>
+                    <label>
+                      <span>Date from</span>
+                      <input type="date" value={inventoryDateFrom} onChange={(event) => setInventoryDateFrom(event.target.value)} />
+                    </label>
+                    <label>
+                      <span>Date to</span>
+                      <input type="date" value={inventoryDateTo} onChange={(event) => setInventoryDateTo(event.target.value)} />
+                    </label>
+                  </div>
+                </div>
+
+                {loading ? (
+                  <div className="empty-state compact"><div className="empty-icon">...</div><h3>Loading your inventory</h3></div>
+                ) : filteredInventory.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-icon">□</div>
+                    <h3>No items match your filters</h3>
+                    <p>Try widening the category, price, or date range.</p>
+                    <a href="#record">Record a purchase →</a>
+                  </div>
+                ) : (<>
+                  <div className="inventory-table-wrap">
+                    <table className="inventory-table">
+                      <thead><tr><th>Item</th><th>Status</th><th>Number</th><th>Cost</th><th>Sold</th><th>Profit</th></tr></thead>
+                      <tbody>
+                        {filteredInventory.map((item) => (
+                          <tr key={item.name}>
+                            <td><button type="button" className="inventory-link" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.name}</button></td>
+                            <td><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
+                            <td><button type="button" className="item-number item-button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.onHand}</button></td>
+                            <td><button type="button" className="detail-value" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{money.format(item.averageCost / 100)}</button></td>
+                            <td><button type="button" className="detail-value" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{money.format(item.revenue / 100)}</button></td>
+                            <td><button type="button" className={`detail-value ${item.profit < 0 ? "negative" : "profit"}`} onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{money.format(item.profit / 100)}</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="inventory-mobile-list">
                     {filteredInventory.map((item) => (
-                      <tr key={item.name}>
-                        <td><button type="button" className="inventory-link" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.name}</button></td>
-                        <td><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
-                        <td><button type="button" className="item-number item-button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.onHand}</button></td>
-                        <td><button type="button" className="detail-value" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{money.format(item.averageCost / 100)}</button></td>
-                        <td><button type="button" className="detail-value" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{money.format(item.revenue / 100)}</button></td>
-                        <td><button type="button" className={`detail-value ${item.profit < 0 ? "negative" : "profit"}`} onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{money.format(item.profit / 100)}</button></td>
-                      </tr>
+                      <article className="inventory-mobile-card" key={item.key}>
+                        <div className="mobile-item-head"><button type="button" className="inventory-link" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.name}</button><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
+                        <div className="mobile-item-stats"><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Number</span><strong>{item.onHand}</strong></button><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Cost</span><strong>{money.format(item.averageCost / 100)}</strong></button><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Sold</span><strong>{money.format(item.revenue / 100)}</strong></button><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Profit</span><strong className={item.profit < 0 ? "negative" : "profit"}>{money.format(item.profit / 100)}</strong></button></div>
+                      </article>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                </>)}
+              </>
+            )}
+
+            {mainTab !== "Inventory" && (
+              <div className="tab-transaction-list">
+                {(mainTab === "Bought" ? boughtTransactions : soldTransactions).length === 0 ? (
+                  <div className="empty-state compact"><div className="empty-icon">□</div><h3>No {mainTab.toLowerCase()} records yet</h3></div>
+                ) : (
+                  (mainTab === "Bought" ? boughtTransactions : soldTransactions).map((entry) => (
+                    <article className="tab-transaction-row" key={entry.id}>
+                      <div>
+                        <strong>{entry.itemName}</strong>
+                        <p>{formatDate(entry.transactionDate)} · {entry.category} · {entry.source} · {entry.quantity} x {money.format(entry.unitPriceCents / 100)}{entry.notes ? ` · ${entry.notes}` : ""}</p>
+                      </div>
+                      <strong className={entry.type === "buy" ? "negative" : "profit"}>
+                        {entry.type === "buy" ? "-" : "+"}{money.format((entry.quantity * entry.unitPriceCents) / 100)}
+                      </strong>
+                    </article>
+                  ))
+                )}
               </div>
-              <div className="inventory-mobile-list">
-                {filteredInventory.map((item) => (
-                  <article className="inventory-mobile-card" key={item.key}>
-                    <div className="mobile-item-head"><button type="button" className="inventory-link" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.name}</button><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
-                    <div className="mobile-item-stats"><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Number</span><strong>{item.onHand}</strong></button><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Cost</span><strong>{money.format(item.averageCost / 100)}</strong></button><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Sold</span><strong>{money.format(item.revenue / 100)}</strong></button><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Profit</span><strong className={item.profit < 0 ? "negative" : "profit"}>{money.format(item.profit / 100)}</strong></button></div>
-                  </article>
-                ))}
-              </div>
-            </>)}
+            )}
           </section>
 
         </div>
