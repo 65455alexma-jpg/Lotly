@@ -39,6 +39,7 @@ type SelectedItem = {
 type InventoryRow = {
   key: string;
   name: string;
+  category: ProductCategory;
   bought: number;
   sold: number;
   onHand: number;
@@ -46,6 +47,8 @@ type InventoryRow = {
   invested: number;
   revenue: number;
   profit: number;
+  firstDate: string;
+  lastDate: string;
 };
 
 type InventoryStatus = "In stock" | "Listed" | "On hold" | "Sold" | "Returned";
@@ -191,6 +194,11 @@ export default function TrackerApp() {
   const [notes, setNotes] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "buy" | "sell">("all");
+  const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<"all" | ProductCategory>("all");
+  const [inventoryMinPrice, setInventoryMinPrice] = useState("");
+  const [inventoryMaxPrice, setInventoryMaxPrice] = useState("");
+  const [inventoryDateFrom, setInventoryDateFrom] = useState("");
+  const [inventoryDateTo, setInventoryDateTo] = useState("");
   const [readingScreenshot, setReadingScreenshot] = useState(false);
   const [readingProgress, setReadingProgress] = useState(0);
   const [importedItems, setImportedItems] = useState<ImportedItem[]>([]);
@@ -233,6 +241,7 @@ export default function TrackerApp() {
       const row = rows.get(key) ?? {
         key,
         name: transaction.itemName,
+        category: transaction.category ?? "Other",
         bought: 0,
         sold: 0,
         onHand: 0,
@@ -240,7 +249,12 @@ export default function TrackerApp() {
         invested: 0,
         revenue: 0,
         profit: 0,
+        firstDate: transaction.transactionDate,
+        lastDate: transaction.transactionDate,
       };
+      row.category = row.category ?? transaction.category ?? "Other";
+      row.firstDate = row.firstDate < transaction.transactionDate ? row.firstDate : transaction.transactionDate;
+      row.lastDate = row.lastDate > transaction.transactionDate ? row.lastDate : transaction.transactionDate;
 
       if (transaction.type === "buy") {
         row.bought += transaction.quantity;
@@ -258,6 +272,19 @@ export default function TrackerApp() {
 
     return Array.from(rows.values()).sort((a, b) => b.onHand - a.onHand);
   }, [transactions]);
+
+  const filteredInventory = useMemo(() => {
+    const minPrice = Number(inventoryMinPrice);
+    const maxPrice = Number(inventoryMaxPrice);
+    return inventory.filter((item) => {
+      const categoryMatches = inventoryCategoryFilter === "all" || item.category === inventoryCategoryFilter;
+      const minMatches = !inventoryMinPrice || Number.isNaN(minPrice) || item.averageCost / 100 >= minPrice;
+      const maxMatches = !inventoryMaxPrice || Number.isNaN(maxPrice) || item.averageCost / 100 <= maxPrice;
+      const fromMatches = !inventoryDateFrom || item.lastDate >= inventoryDateFrom;
+      const toMatches = !inventoryDateTo || item.firstDate <= inventoryDateTo;
+      return categoryMatches && minMatches && maxMatches && fromMatches && toMatches;
+    });
+  }, [inventory, inventoryCategoryFilter, inventoryDateFrom, inventoryDateTo, inventoryMaxPrice, inventoryMinPrice]);
 
   const totals = useMemo(() => {
     const purchaseSpend = transactions
@@ -779,16 +806,51 @@ export default function TrackerApp() {
                 <p className="eyebrow">CURRENT POSITION</p>
                 <h2>Your inventory</h2>
               </div>
-              <span className="item-count">{inventory.length} {inventory.length === 1 ? "item" : "items"}</span>
+              <span className="item-count">{filteredInventory.length} {filteredInventory.length === 1 ? "item" : "items"}</span>
+            </div>
+
+            <div className="inventory-filters" aria-label="Inventory filters">
+              <label>
+                <span>Category</span>
+                <select value={inventoryCategoryFilter} onChange={(event) => setInventoryCategoryFilter(event.target.value as "all" | ProductCategory)}>
+                  <option value="all">All categories</option>
+                  {categories.map((option) => <option value={option} key={option}>{option}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Min cost</span>
+                <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMinPrice} onChange={(event) => setInventoryMinPrice(event.target.value)} placeholder="0.00" /></div>
+              </label>
+              <label>
+                <span>Max cost</span>
+                <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={inventoryMaxPrice} onChange={(event) => setInventoryMaxPrice(event.target.value)} placeholder="0.00" /></div>
+              </label>
+              <label>
+                <span>Date from</span>
+                <input type="date" value={inventoryDateFrom} onChange={(event) => setInventoryDateFrom(event.target.value)} />
+              </label>
+              <label>
+                <span>Date to</span>
+                <input type="date" value={inventoryDateTo} onChange={(event) => setInventoryDateTo(event.target.value)} />
+              </label>
+              <button type="button" className="inventory-filter-clear" onClick={() => {
+                setInventoryCategoryFilter("all");
+                setInventoryMinPrice("");
+                setInventoryMaxPrice("");
+                setInventoryDateFrom("");
+                setInventoryDateTo("");
+              }}>
+                Clear filters
+              </button>
             </div>
 
             {loading ? (
               <div className="empty-state compact"><div className="empty-icon">···</div><h3>Loading your inventory</h3></div>
-            ) : inventory.length === 0 ? (
+            ) : filteredInventory.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon">□</div>
-                <h3>No stock recorded yet</h3>
-                <p>Add your first purchase and it will appear here automatically.</p>
+                <h3>No items match your filters</h3>
+                <p>Try widening the category, price, or date range.</p>
                 <a href="#record">Record a purchase →</a>
               </div>
             ) : (<>
@@ -796,7 +858,7 @@ export default function TrackerApp() {
                 <table className="inventory-table">
                   <thead><tr><th>Item</th><th>Status</th><th>Number</th><th>Cost</th><th>Sold</th><th>Profit</th></tr></thead>
                   <tbody>
-                    {inventory.map((item) => (
+                    {filteredInventory.map((item) => (
                       <tr key={item.name}>
                         <td><button type="button" className="inventory-link" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.name}</button></td>
                         <td><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
@@ -810,7 +872,7 @@ export default function TrackerApp() {
                 </table>
               </div>
               <div className="inventory-mobile-list">
-                {inventory.map((item) => (
+                {filteredInventory.map((item) => (
                   <article className="inventory-mobile-card" key={item.key}>
                     <div className="mobile-item-head"><button type="button" className="inventory-link" onClick={() => setSelectedItem({ key: item.key, name: item.name })}>{item.name}</button><select className={`status-select status-${(itemStatuses[item.key] ?? "In stock").replaceAll(" ", "-").toLowerCase()}`} value={itemStatuses[item.key] ?? "In stock"} onChange={(event) => void updateInventoryStatus(item, event.target.value as InventoryStatus)} aria-label={`Status for ${item.name}`}>{inventoryStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
                     <div className="mobile-item-stats"><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Number</span><strong>{item.onHand}</strong></button><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Cost</span><strong>{money.format(item.averageCost / 100)}</strong></button><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Sold</span><strong>{money.format(item.revenue / 100)}</strong></button><button type="button" onClick={() => setSelectedItem({ key: item.key, name: item.name })}><span>Profit</span><strong className={item.profit < 0 ? "negative" : "profit"}>{money.format(item.profit / 100)}</strong></button></div>

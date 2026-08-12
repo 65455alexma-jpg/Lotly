@@ -125,6 +125,11 @@ input:focus, select:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba
 .inventory-panel, .analysis-panel, .history-panel { padding: 28px 30px; }
 .inline-heading { align-items: center; }
 .item-count { font-size: 11px; color: var(--ink-soft); border: 1px solid var(--line); border-radius: 999px; padding: 7px 10px; }
+.inventory-filters { display: grid; grid-template-columns: 1.1fr .75fr .75fr .75fr .75fr auto; gap: 10px; margin-bottom: 18px; padding: 14px; border: 1px solid #e8e3d9; border-radius: 16px; background: #faf8f2; }
+.inventory-filters label { margin: 0; }
+.inventory-filters label > span { font-size: 10px; margin-bottom: 6px; }
+.inventory-filters input, .inventory-filters select { background: #fffefa; padding: 10px 11px; font-size: 12px; }
+.inventory-filter-clear { align-self: end; min-height: 42px; border: 0; border-radius: 10px; background: var(--ink); color: white; font-size: 12px; font-weight: 800; cursor: pointer; padding: 0 14px; }
 .empty-state { min-height: 255px; border: 1px dashed var(--line); border-radius: 14px; background: #faf8f2; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; }
 .empty-state.compact { min-height: 160px; }
 .empty-icon { width: 46px; height: 46px; border-radius: 50%; background: var(--yellow-soft); display: grid; place-items: center; font: 500 25px/1 var(--font-display), serif; }
@@ -242,6 +247,8 @@ footer a { text-decoration: none; font-weight: 700; }
   .workspace { padding: 10px 18px 54px; gap: 14px; }
   .entry-panel, .inventory-panel, .analysis-panel, .history-panel { padding: 22px 18px; border-radius: 16px; }
   .section-heading h2 { font-size: 25px; }
+  .inventory-filters { grid-template-columns: 1fr 1fr; }
+  .inventory-filter-clear { grid-column: 1 / -1; }
   .screenshot-import { grid-template-columns: auto 1fr; padding: 13px; }
   .screenshot-import button { grid-column: 2; justify-self: start; min-height: 36px; }
   .batch-review { margin-left: -3px; margin-right: -3px; padding: 12px; }
