@@ -156,19 +156,11 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Invalid transaction." }, { status: 400 });
     }
 
-    const transactions = await listTransactions();
-    const transaction = transactions.find((entry) => entry.id === id);
-    if (!transaction) {
+    const deleted = await deleteTransaction(id);
+    if (!deleted) {
       return NextResponse.json({ error: "Transaction not found." }, { status: 404 });
     }
-    if (transaction.type === "buy") {
-      const available = await availableStock(transaction.itemName);
-      if (available < transaction.quantity) {
-        return NextResponse.json({ error: "Remove the related sales before removing this purchase." }, { status: 400 });
-      }
-    }
 
-    await deleteTransaction(id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ error: safeErrorMessage(error, "Could not remove this transaction.") }, { status: 500 });

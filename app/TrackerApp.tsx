@@ -188,8 +188,8 @@ export default function TrackerApp() {
   const [quantity, setQuantity] = useState("1");
   const [unitPrice, setUnitPrice] = useState("");
   const [date, setDate] = useState(localDate());
-  const [source, setSource] = useState<"eBay" | "Vinted" | "Other">("eBay");
-  const [category, setCategory] = useState<ProductCategory>("Cloth");
+  const [source, setSource] = useState<"eBay" | "Vinted" | "Other">("Vinted");
+  const [category, setCategory] = useState<ProductCategory>("Bag");
   const [notes, setNotes] = useState("");
   const [mainTab, setMainTab] = useState<MainTab>("Inventory");
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<"all" | ProductCategory>("all");
@@ -197,6 +197,7 @@ export default function TrackerApp() {
   const [inventoryMaxPrice, setInventoryMaxPrice] = useState("");
   const [inventoryDateFrom, setInventoryDateFrom] = useState("");
   const [inventoryDateTo, setInventoryDateTo] = useState("");
+  const [itemSearch, setItemSearch] = useState("");
   const [readingScreenshot, setReadingScreenshot] = useState(false);
   const [readingProgress, setReadingProgress] = useState(0);
   const [importedItems, setImportedItems] = useState<ImportedItem[]>([]);
@@ -276,15 +277,17 @@ export default function TrackerApp() {
   const filteredInventory = useMemo(() => {
     const minPrice = Number(inventoryMinPrice);
     const maxPrice = Number(inventoryMaxPrice);
+    const search = itemSearch.trim().toLowerCase();
     return inventory.filter((item) => {
+      const searchMatches = !search || item.name.toLowerCase().includes(search);
       const categoryMatches = inventoryCategoryFilter === "all" || item.category === inventoryCategoryFilter;
       const minMatches = !inventoryMinPrice || Number.isNaN(minPrice) || item.averageCost / 100 >= minPrice;
       const maxMatches = !inventoryMaxPrice || Number.isNaN(maxPrice) || item.averageCost / 100 <= maxPrice;
       const fromMatches = !inventoryDateFrom || item.lastDate >= inventoryDateFrom;
       const toMatches = !inventoryDateTo || item.firstDate <= inventoryDateTo;
-      return categoryMatches && minMatches && maxMatches && fromMatches && toMatches;
+      return searchMatches && categoryMatches && minMatches && maxMatches && fromMatches && toMatches;
     });
-  }, [inventory, inventoryCategoryFilter, inventoryDateFrom, inventoryDateTo, inventoryMaxPrice, inventoryMinPrice]);
+  }, [inventory, inventoryCategoryFilter, inventoryDateFrom, inventoryDateTo, inventoryMaxPrice, inventoryMinPrice, itemSearch]);
 
   const totals = useMemo(() => {
     const averageCostByKey = new Map(inventory.map((item) => [item.key, item.averageCost]));
@@ -324,30 +327,34 @@ export default function TrackerApp() {
   const filteredBoughtTransactions = useMemo(() => {
     const minPrice = Number(inventoryMinPrice);
     const maxPrice = Number(inventoryMaxPrice);
+    const search = itemSearch.trim().toLowerCase();
     return boughtTransactions.filter((entry) => {
       const price = entry.unitPriceCents / 100;
+      const searchMatches = !search || entry.itemName.toLowerCase().includes(search);
       const categoryMatches = inventoryCategoryFilter === "all" || entry.category === inventoryCategoryFilter;
       const minMatches = !inventoryMinPrice || Number.isNaN(minPrice) || price >= minPrice;
       const maxMatches = !inventoryMaxPrice || Number.isNaN(maxPrice) || price <= maxPrice;
       const fromMatches = !inventoryDateFrom || entry.transactionDate >= inventoryDateFrom;
       const toMatches = !inventoryDateTo || entry.transactionDate <= inventoryDateTo;
-      return categoryMatches && minMatches && maxMatches && fromMatches && toMatches;
+      return searchMatches && categoryMatches && minMatches && maxMatches && fromMatches && toMatches;
     });
-  }, [boughtTransactions, inventoryCategoryFilter, inventoryDateFrom, inventoryDateTo, inventoryMaxPrice, inventoryMinPrice]);
+  }, [boughtTransactions, inventoryCategoryFilter, inventoryDateFrom, inventoryDateTo, inventoryMaxPrice, inventoryMinPrice, itemSearch]);
 
   const filteredSoldTransactions = useMemo(() => {
     const minPrice = Number(inventoryMinPrice);
     const maxPrice = Number(inventoryMaxPrice);
+    const search = itemSearch.trim().toLowerCase();
     return soldTransactions.filter((entry) => {
       const price = entry.unitPriceCents / 100;
+      const searchMatches = !search || entry.itemName.toLowerCase().includes(search);
       const categoryMatches = inventoryCategoryFilter === "all" || entry.category === inventoryCategoryFilter;
       const minMatches = !inventoryMinPrice || Number.isNaN(minPrice) || price >= minPrice;
       const maxMatches = !inventoryMaxPrice || Number.isNaN(maxPrice) || price <= maxPrice;
       const fromMatches = !inventoryDateFrom || entry.transactionDate >= inventoryDateFrom;
       const toMatches = !inventoryDateTo || entry.transactionDate <= inventoryDateTo;
-      return categoryMatches && minMatches && maxMatches && fromMatches && toMatches;
+      return searchMatches && categoryMatches && minMatches && maxMatches && fromMatches && toMatches;
     });
-  }, [soldTransactions, inventoryCategoryFilter, inventoryDateFrom, inventoryDateTo, inventoryMaxPrice, inventoryMinPrice]);
+  }, [soldTransactions, inventoryCategoryFilter, inventoryDateFrom, inventoryDateTo, inventoryMaxPrice, inventoryMinPrice, itemSearch]);
 
   const performance = useMemo(() => {
     const filteredKeys = new Set(filteredInventory.map((item) => item.key));
@@ -524,8 +531,8 @@ export default function TrackerApp() {
       setItemName("");
       setQuantity("1");
       setUnitPrice("");
-      setSource("eBay");
-      setCategory("Cloth");
+      setSource("Vinted");
+      setCategory("Bag");
       setNotes("");
       setNotice(type === "buy" ? "Purchase recorded." : "Sale recorded.");
     } catch (saveError) {
@@ -535,11 +542,13 @@ export default function TrackerApp() {
     }
   }
 
-  async function removeTransaction(id: number) {
+  async function removeTransaction(entry: Transaction) {
+    const confirmed = window.confirm(`Delete this ${entry.type === "buy" ? "buy" : "sale"} record for ${entry.itemName}?`);
+    if (!confirmed) return;
     setError("");
-    const response = await fetch(`/api/transactions?id=${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/transactions?id=${entry.id}`, { method: "DELETE" });
     if (response.ok) {
-      setTransactions((current) => current.filter((entry) => entry.id !== id));
+      setTransactions((current) => current.filter((currentEntry) => currentEntry.id !== entry.id));
       setNotice("Transaction removed.");
       return;
     }
@@ -559,7 +568,7 @@ export default function TrackerApp() {
         quantity: String(Math.max(1, item.onHand || item.sold || 1)),
         unitPrice: String(Math.max(0, Math.round(item.averageCost) / 100 || 0)),
         transactionDate: localDate(),
-        source: "eBay",
+        source: "Vinted",
         category: "Bag",
       });
       return;
@@ -938,7 +947,7 @@ export default function TrackerApp() {
               <div className="inventory-filters-head">
                 <div>
                   <p className="eyebrow">FILTERS</p>
-                  <strong>View, category, price, and date</strong>
+                  <strong>Search, category, price, and date</strong>
                 </div>
                 <button type="button" className="inventory-filter-clear" onClick={() => {
                   setMainTab("Inventory");
@@ -947,6 +956,7 @@ export default function TrackerApp() {
                   setInventoryMaxPrice("");
                   setInventoryDateFrom("");
                   setInventoryDateTo("");
+                  setItemSearch("");
                 }}>
                   Clear
                 </button>
@@ -959,6 +969,10 @@ export default function TrackerApp() {
                     <option value="Sold">Sold</option>
                     <option value="Inventory">Inventory</option>
                   </select>
+                </label>
+                <label className="search-filter">
+                  <span>Item name</span>
+                  <input type="search" value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} placeholder="Search product name..." />
                 </label>
                 <label>
                   <span>Category</span>
@@ -1048,6 +1062,7 @@ export default function TrackerApp() {
                       <div>
                         <strong>{entry.itemName}</strong>
                         <button type="button" className="row-edit-button inline-edit" onClick={() => startTransactionEdit(entry)}>Edit</button>
+                        <button type="button" className="row-delete-button inline-edit" onClick={() => void removeTransaction(entry)}>Delete</button>
                         <p>{formatDate(entry.transactionDate)} · {entry.category} · {entry.source} · {entry.quantity} x {money.format(entry.unitPriceCents / 100)}{entry.notes ? ` · ${entry.notes}` : ""}</p>
                       </div>
                       <strong className={entry.type === "buy" ? "negative" : "profit"}>
@@ -1155,6 +1170,7 @@ export default function TrackerApp() {
                         <strong>{entry.type === "buy" ? "Purchase" : "Sale"}</strong>
                         <span className={`type-label ${entry.type}`}>{formatDate(entry.transactionDate)}</span>
                         <button type="button" className="row-edit-button" onClick={() => startTransactionEdit(entry)}>Edit</button>
+                        <button type="button" className="row-delete-button" onClick={() => void removeTransaction(entry)}>Delete</button>
                       </div>
                       <p>{entry.quantity} × {money.format(entry.unitPriceCents / 100)} · {entry.source} · {entry.category}</p>
                       {entry.notes && <p>{entry.notes}</p>}
